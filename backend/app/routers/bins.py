@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException, Query
 from app import db
 from app.config import DEVICE_REGISTRY, device_info, get_settings
 from app.models import Bin, BinHistoryPoint
-from app.mqtt_client import fill_status
+from app.telemetry import fill_status
 
 router = APIRouter(prefix="/api/bins", tags=["bins"])
 

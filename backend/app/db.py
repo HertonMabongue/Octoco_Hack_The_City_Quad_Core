@@ -134,6 +134,12 @@ def get_device_status(device_id: str) -> tuple[str, str]:
     return (row[0], row[1]) if row else ("offline", "normal")
 
 
+def list_online_device_ids() -> list[str]:
+    with get_connection() as con:
+        rows = con.execute("SELECT device_id FROM device_status WHERE connection = 'online'").fetchall()
+    return [row[0] for row in rows]
+
+
 def latest_reading_by_device() -> list[dict[str, Any]]:
     with get_connection() as con:
         rows = con.execute(

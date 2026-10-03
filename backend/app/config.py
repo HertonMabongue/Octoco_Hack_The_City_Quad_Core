@@ -41,6 +41,20 @@ class Settings(BaseSettings):
 
     cors_origins: list[str] = ["*"]
 
+    # Mock telemetry — generates plausible readings for every device in
+    # DEVICE_REGISTRY and feeds them through the same path a real firmware
+    # POST would use, so the city broker shows us online today. Turn off
+    # (MOCK_TELEMETRY_ENABLED=false) once real firmware is posting — running
+    # both at once for the same device IDs will interleave fake and real
+    # readings.
+    mock_telemetry_enabled: bool = True
+    mock_interval_s: int = 30
+
+    # If a device hasn't posted a reading in this long, we stop telling the
+    # city it's online (publishes a retained offline status) — otherwise a
+    # dead device/mock looks perpetually "online" on the city dashboard.
+    offline_after_s: int = 90
+
 
 # Known bin devices and where they sit along the corridor. Telemetry only
 # carries a device slug + sensor metrics, not a label or coordinates, so

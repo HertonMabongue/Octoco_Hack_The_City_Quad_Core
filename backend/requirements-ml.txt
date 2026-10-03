@@ -1,0 +1,5 @@
+# Optional dependencies for the forecasting model (see app/forecasting/README.md).
+# Kept separate from requirements.txt so the core backend stays light to
+# install for anyone not working on this part.
+#
+# pip install -r backend/requirements.txt -r backend/requirements-ml.txt

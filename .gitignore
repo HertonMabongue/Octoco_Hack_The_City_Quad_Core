@@ -238,3 +238,7 @@ next-env.d.ts
 backend/*.sqlite3
 backend/*.db
 backend/uploads/
+
+# Trained forecasting model artifacts — regenerate via train.py, don't commit
+backend/app/forecasting/artifacts/*
+!backend/app/forecasting/artifacts/.gitkeep

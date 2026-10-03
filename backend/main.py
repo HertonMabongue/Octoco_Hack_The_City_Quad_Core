@@ -1,4 +1,5 @@
-"""FastAPI entrypoint: app wiring, CORS, static uploads, and MQTT lifecycle.
+"""FastAPI entrypoint: app wiring, CORS, static uploads, and background
+task lifecycle (mock telemetry generator + offline watchdog).
 
 Run with: uvicorn main:app --reload --app-dir backend
 """
@@ -11,18 +12,21 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from app import db
+from app import city_client, db, mock_generator, watchdog
 from app.config import get_settings
-from app.mqtt_client import start_mqtt_subscriber, stop_mqtt_subscriber
-from app.routers import alerts, bins, reports
+from app.routers import alerts, bins, ingest, reports
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
+    settings = get_settings()
     db.init_db()
-    start_mqtt_subscriber()
+    mock_generator.start(settings)
+    watchdog.start(settings)
     yield
-    stop_mqtt_subscriber()
+    watchdog.stop()
+    mock_generator.stop()
+    city_client.shutdown()
 
 
 app = FastAPI(title="Adam Tas Corridor — Waste & Recycling API", lifespan=lifespan)
@@ -42,6 +46,7 @@ app.mount("/uploads", StaticFiles(directory=settings.upload_dir), name="uploads"
 app.include_router(bins.router)
 app.include_router(alerts.router)
 app.include_router(reports.router)
+app.include_router(ingest.router)
 
 
 @app.get("/health", tags=["meta"])

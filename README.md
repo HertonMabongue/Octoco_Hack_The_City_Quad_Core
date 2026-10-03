@@ -25,12 +25,22 @@ hardware sees to what a resident sees to what an operator can act on.
 ## Architecture
 
 ```
-firmware/   ESP32 + ultrasonic sensor — bin fill-level telemetry
-backend/    Python/FastAPI — subscribes to the city MQTT broker, persists
-            readings/alerts/reports in SQLite, and exposes a typed REST API
+firmware/   ESP32 + ultrasonic sensor — posts raw readings to the backend
+            over the local network (no MQTT on the device itself)
+backend/    Python/FastAPI — the one thing that speaks the city's MQTT
+            protocol; persists readings/alerts/reports in SQLite and
+            exposes a typed REST API to the frontend
 frontend/   Next.js (App Router) — the municipal dashboard and community app,
             deployed at https://kleanclorridor.vercel.app
 ```
+
+Firmware does **not** talk to the city MQTT broker directly. It POSTs raw
+readings to the backend over the local network (plain HTTP — far more
+stable than a persistent MQTT connection on a battery-powered device over
+flaky event wifi), and the backend is the single place that speaks the
+city's protocol correctly: topic shape, retained status, LWT, reconnects.
+This also means the backend can go live on the city broker with generated
+readings today, before firmware is ready — see Mock telemetry below.
 
 **Tech stack:** TypeScript (strict) + Tailwind CSS + shadcn/ui on the
 frontend, Pydantic models + typed FastAPI routers on the backend, built to
@@ -80,12 +90,50 @@ Conforms to the Hack the City communication protocol.
 
 - **HTTP fallback**, if MQTT is unreachable:
   `POST http://192.168.101.123:8000/api/v1/teams/{team}/devices/{device}/telemetry`
+  (the city's own fallback endpoint — not ours; see below for the
+  backend's own local endpoint firmware actually posts to)
 
-The backend (`backend/app/mqtt_client.py`) subscribes to
-`hack/kmm4v/+/telemetry` and `hack/kmm4v/+/status` on that same broker,
-persists readings, and raises an `overflow` alert when a bin crosses the
-critical fill threshold, or an `offline` alert when a device's retained
-status flips to offline.
+`backend/app/city_client.py` is the only thing in this stack that opens a
+connection to the city broker. It keeps one MQTT connection per device
+(not one shared connection), because LWT is a per-connection feature — a
+device only gets its own `"offline"` published automatically on an
+unexpected drop if it has its own connection.
+
+### Local ingest (firmware → backend)
+
+Firmware POSTs raw readings to the backend over the local network —
+**not** to the city broker or the city's HTTP fallback:
+
+```
+POST http://<backend-host>:8000/api/devices/{device_id}/readings
+Content-Type: application/json
+
+{"uptime_s": 128, "fill_pct": 64.0, "distance_cm": 18.4, "overflow_flag": false}
+```
+
+`device_id` must already be in `DEVICE_REGISTRY` (`backend/app/config.py`)
+— that's where label/lat/lng come from, since the reading itself doesn't
+carry them. `backend/app/telemetry.py` takes it from there: stores the
+reading, evaluates the overflow threshold, derives `mode`, and republishes
+to the city broker in the correct protocol shape (`app/city_client.py`).
+
+### Mock telemetry (bridge until firmware is posting)
+
+With `MOCK_TELEMETRY_ENABLED=true` (the default — see `.env.example`), the
+backend generates plausible readings for every device in
+`DEVICE_REGISTRY` and feeds them through the exact same
+`app/telemetry.record_reading` path a real firmware POST would use
+(`backend/app/mock_generator.py`). That means the backend shows up online
+on the city broker and starts earning uptime score immediately, without
+waiting on firmware. **Turn it off** (`MOCK_TELEMETRY_ENABLED=false`) once
+real firmware is posting to `/api/devices/{id}/readings` for the same
+device IDs — running both at once interleaves fake and real readings for
+the same bin.
+
+A background watchdog (`backend/app/watchdog.py`) also marks a device
+offline — locally and to the city, via a retained status publish — if it
+hasn't posted a reading in `OFFLINE_AFTER_S` (default 90s), so a dead
+mock/firmware doesn't look perpetually online.
 
 ## API contract (backend ↔ frontend)
 
@@ -128,9 +176,10 @@ that means `uvicorn` is running outside a venv with the current
 ### 1. Firmware (ESP32)
 
 Owned separately — see the firmware team for build/flash instructions. It
-must publish to the topics and payload shape in the integration spec above.
+posts to the backend's local `/api/devices/{id}/readings` endpoint (see
+Local ingest above), not to the city broker directly.
 
-### 2. Backend (FastAPI + MQTT subscriber)
+### 2. Backend (FastAPI + city publisher)
 
 ```bash
 python -m venv .venv
@@ -144,15 +193,25 @@ Project layout:
 
 ```
 backend/
-  main.py                 FastAPI app, CORS, static /uploads, MQTT lifecycle
+  main.py                 FastAPI app, CORS, static /uploads, background task lifecycle
   app/
     config.py              Settings (env-driven) + known device registry
     db.py                  SQLite persistence
     models.py               Pydantic request/response models
-    mqtt_client.py           MQTT subscriber + alert evaluation
+    telemetry.py             Records a reading → DB + alerts + relays to the city
+    city_client.py           The only thing that speaks the city MQTT protocol
+    mock_generator.py        Generates readings until firmware is posting (toggleable)
+    watchdog.py               Marks stale devices offline (locally + to the city)
     routers/
-      bins.py, alerts.py, reports.py
+      bins.py, alerts.py, reports.py, ingest.py
+    forecasting/             Fill-rate prediction model (scaffolded, not built yet)
 ```
+
+**Forecasting (not started):** `backend/app/forecasting/` is scaffolded for
+a fill-rate prediction model (linear/Bayesian regression over a bin's
+fill-level history, to estimate time-to-full ahead of it actually
+overflowing). See `backend/app/forecasting/README.md` for the data access
+points and suggested shape before starting on it.
 
 ### 3. Frontend (Next.js + TypeScript + Tailwind + shadcn/ui)
 
