@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
+import { Archive, BookOpen, CheckCircle2, Clock } from "lucide-react";
 
 import AssetRegistryTable from "@/components/library/AssetRegistryTable";
-import DocsAndSops from "@/components/library/DocsAndSops";
+import DocsAndSops, { DOCS_COUNT } from "@/components/library/DocsAndSops";
 import IncidentList from "@/components/library/IncidentList";
 import LibraryTabs from "@/components/library/LibraryTabs";
+import Tile from "@/components/dashboard/Tile";
 import { getBins, getReports } from "@/lib/api";
 
 export const metadata: Metadata = {
@@ -13,6 +15,8 @@ export const metadata: Metadata = {
 
 export default async function LibraryPage() {
   const [bins, reports] = await Promise.all([getBins(), getReports()]);
+  const openReports = reports.filter((r) => !r.resolved).length;
+  const resolvedReports = reports.length - openReports;
 
   return (
     <div>
@@ -21,6 +25,37 @@ export default async function LibraryPage() {
         Reports and incidents, the bin and sensor registry, and reference documents, all in one
         place.
       </p>
+
+      <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <Tile
+          label="Open reports"
+          value={String(openReports)}
+          icon={Clock}
+          tone={openReports ? "warning" : "good"}
+          sub={openReports ? "needs review" : "all clear"}
+        />
+        <Tile
+          label="Resolved reports"
+          value={String(resolvedReports)}
+          icon={CheckCircle2}
+          tone="good"
+          sub="closed out"
+        />
+        <Tile
+          label="Registered bins"
+          value={String(bins.length)}
+          icon={Archive}
+          tone="info"
+          sub="in the asset registry"
+        />
+        <Tile
+          label="Reference docs"
+          value={String(DOCS_COUNT)}
+          icon={BookOpen}
+          tone="violet"
+          sub="SOPs and guides"
+        />
+      </div>
 
       <div className="mt-6">
         <LibraryTabs

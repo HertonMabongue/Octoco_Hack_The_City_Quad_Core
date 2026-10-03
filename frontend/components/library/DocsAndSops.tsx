@@ -69,6 +69,8 @@ const DOCS: Doc[] = [
   },
 ];
 
+export const DOCS_COUNT = DOCS.length;
+
 export default function DocsAndSops() {
   return (
     <div className="divide-y divide-border/60 rounded-xl border border-border/60 bg-card shadow-card">

@@ -2,20 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  ArrowLeft,
-  Archive,
-  LayoutDashboard,
-  Recycle,
-  TrendingUp,
-  UserCog,
-} from "lucide-react";
+import { ArrowLeft, Archive, LayoutDashboard, Recycle, TrendingUp, UserCog } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
 const LINKS = [
   { href: "/dashboard", label: "Overview", icon: LayoutDashboard, exact: true },
-  { href: "/dashboard/insights", label: "Insights", icon: TrendingUp, exact: false },
+  { href: "/dashboard/insights", label: "Machine Learning", icon: TrendingUp, exact: false },
   { href: "/dashboard/library", label: "Library", icon: Archive, exact: false },
   { href: "/dashboard/account", label: "Account", icon: UserCog, exact: false },
 ];
@@ -31,7 +24,7 @@ export default function SidebarNav({ onNavigate }: { onNavigate?: () => void }) 
       <Link
         href="/"
         onClick={onNavigate}
-        className="mb-8 flex items-center gap-2.5 font-display text-[15px] font-semibold"
+        className="font-display mb-8 flex items-center gap-2.5 text-[15px] font-semibold"
       >
         <span className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-primary-foreground">
           <Recycle className="h-4 w-4" />
