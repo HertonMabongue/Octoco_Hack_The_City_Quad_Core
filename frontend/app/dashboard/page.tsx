@@ -22,7 +22,7 @@ export default async function DashboardPage() {
       </p>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[1.4fr_1fr]">
-        <div className="h-[420px]">
+        <div className="h-72 min-w-0 sm:h-96 lg:h-[420px]">
           <BinMapLoader bins={bins} />
         </div>
 

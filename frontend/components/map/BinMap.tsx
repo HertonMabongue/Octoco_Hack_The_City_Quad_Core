@@ -1,6 +1,7 @@
 "use client";
 
-import { MapContainer, Marker, Popup, TileLayer } from "react-leaflet";
+import { useEffect } from "react";
+import { MapContainer, Marker, Popup, TileLayer, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
@@ -25,6 +26,28 @@ function statusIcon(status: BinStatus) {
   });
 }
 
+// Mobile browsers resize the viewport after first paint (address bar
+// collapsing, orientation change), and Leaflet caches its container size
+// at init — without this it renders into a stale, often-zero-height box
+// and tiles show up cut off or blank until the user manually interacts.
+function InvalidateOnResize() {
+  const map = useMap();
+
+  useEffect(() => {
+    const invalidate = () => map.invalidateSize();
+    const timer = window.setTimeout(invalidate, 200);
+    window.addEventListener("resize", invalidate);
+    window.addEventListener("orientationchange", invalidate);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener("resize", invalidate);
+      window.removeEventListener("orientationchange", invalidate);
+    };
+  }, [map]);
+
+  return null;
+}
+
 export interface BinMapProps {
   bins: Bin[];
   onSelectBin?: (bin: Bin) => void;
@@ -35,8 +58,10 @@ export default function BinMap({ bins, onSelectBin }: BinMapProps) {
     <MapContainer
       center={DEFAULT_MAP_CENTER}
       zoom={15}
-      className="h-full min-h-80 w-full rounded-lg"
+      scrollWheelZoom={false}
+      className="h-full min-h-72 w-full overflow-hidden rounded-lg"
     >
+      <InvalidateOnResize />
       <TileLayer
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         attribution="&copy; OpenStreetMap contributors"

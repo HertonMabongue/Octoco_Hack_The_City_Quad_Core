@@ -29,7 +29,7 @@ export default async function CommunityPage() {
         </Button>
       </div>
 
-      <div className="mt-6 h-96">
+      <div className="mt-6 h-72 min-w-0 sm:h-96">
         <BinMapLoader bins={bins} />
       </div>
 

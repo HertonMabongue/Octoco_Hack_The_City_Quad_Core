@@ -25,11 +25,11 @@ hardware sees to what a resident sees to what an operator can act on.
 ## Architecture
 
 ```
-firmware/   ESP32 + ultrasonic sensor — bin fill-level telemetry (owned by a
-            teammate, built independently; not touched by this overhaul)
+firmware/   ESP32 + ultrasonic sensor — bin fill-level telemetry
 backend/    Python/FastAPI — subscribes to the city MQTT broker, persists
             readings/alerts/reports in SQLite, and exposes a typed REST API
-frontend/   Next.js (App Router) — the municipal dashboard and community app
+frontend/   Next.js (App Router) — the municipal dashboard and community app,
+            deployed at https://kleanclorridor.vercel.app
 ```
 
 **Tech stack:** TypeScript (strict) + Tailwind CSS + shadcn/ui on the
@@ -38,14 +38,10 @@ match end to end — the same `Bin`/`Alert`/`Report` shapes exist as Pydantic
 models in `backend/app/models.py` and TypeScript interfaces in
 `frontend/lib/types.ts`.
 
-> **Note on firmware/backend alignment:** `firmware/src/main.cpp` currently
-> contains an early scaffold (a gas/temperature/pH "river contamination"
-> sensor) from this project's initial setup commit, not the ultrasonic
-> fill-level sensor described above and built against here. The backend and
-> frontend in this repo are built against the fill-level contract below —
-> whoever wires up the real firmware should target that contract (MQTT
-> payload shape, topic names, and the 3 metrics) rather than what's
-> currently in `main.cpp`.
+### Deployment
+
+The frontend is deployed to Vercel (frontend-only — see below for why) at
+**https://kleanclorridor.vercel.app**.
 
 ## City mainframe integration
 
@@ -96,14 +92,14 @@ status flips to offline.
 All response field names are camelCase; see `backend/app/models.py`
 (Pydantic, source of truth) and `frontend/lib/types.ts` (mirrors it).
 
-| Method | Path                   | Description                                      |
-| ------ | ---------------------- | ------------------------------------------------- |
-| GET    | `/api/bins`             | All bins, derived from latest telemetry + status  |
-| GET    | `/api/bins/:id`          | One bin                                           |
-| GET    | `/api/bins/:id/history`  | Fill-level history points for one bin             |
-| GET    | `/api/alerts`            | Recent alerts (overflow, littering, offline)      |
-| POST   | `/api/reports`           | Multipart form: `lat`, `lng`, `note`, `photo`     |
-| GET    | `/health`                | Liveness check                                    |
+| Method | Path                    | Description                                      |
+| ------ | ----------------------- | ------------------------------------------------ |
+| GET    | `/api/bins`             | All bins, derived from latest telemetry + status |
+| GET    | `/api/bins/:id`         | One bin                                          |
+| GET    | `/api/bins/:id/history` | Fill-level history points for one bin            |
+| GET    | `/api/alerts`           | Recent alerts (overflow, littering, offline)     |
+| POST   | `/api/reports`          | Multipart form: `lat`, `lng`, `note`, `photo`    |
+| GET    | `/health`               | Liveness check                                   |
 
 `Bin.status` is `good` / `warning` / `critical`, derived from `fillPct`
 against `FILL_WARNING_PCT` / `FILL_CRITICAL_PCT` (backend
@@ -114,6 +110,20 @@ The frontend falls back to mock data (`frontend/lib/api.ts`) if the backend
 is unreachable, so either side can be developed and demoed independently.
 
 ## Setup
+
+### Quick start (backend + frontend together)
+
+```bash
+./start.sh
+```
+
+Creates/reuses a `.venv` for the backend, installs both sides' dependencies
+if missing, copies `.env.example`/`frontend/.env.local.example` on first
+run, and starts the backend on `:8000` and frontend on `:3000`. Ctrl+C
+stops both. See below for running each side individually, or if you hit
+the `ModuleNotFoundError: No module named 'pydantic_settings'` error —
+that means `uvicorn` is running outside a venv with the current
+`requirements.txt` installed; `./start.sh` avoids that by managing its own.
 
 ### 1. Firmware (ESP32)
 

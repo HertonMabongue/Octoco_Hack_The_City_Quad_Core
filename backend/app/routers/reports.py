@@ -6,7 +6,7 @@ from __future__ import annotations
 import uuid
 from pathlib import Path
 
-from fastapi import APIRouter, File, Form, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
 from app import db
 from app.config import get_settings
@@ -15,11 +15,16 @@ from app.models import ReportResult
 router = APIRouter(prefix="/api/reports", tags=["reports"])
 
 ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"}
+MAX_UPLOAD_BYTES = 8 * 1024 * 1024  # 8MB — comfortably fits a phone photo, caps abuse on a public endpoint
+CHUNK_SIZE = 1024 * 1024
 
 
 def _save_photo(photo: UploadFile) -> str | None:
     if photo is None or not photo.filename:
         return None
+
+    if photo.content_type not in ALLOWED_IMAGE_TYPES:
+        raise HTTPException(status_code=415, detail="Unsupported photo type")
 
     settings = get_settings()
     upload_dir = Path(settings.upload_dir)
@@ -28,8 +33,16 @@ def _save_photo(photo: UploadFile) -> str | None:
     suffix = Path(photo.filename).suffix or ".jpg"
     filename = f"{uuid.uuid4()}{suffix}"
     destination = upload_dir / filename
+
+    size = 0
     with destination.open("wb") as out:
-        out.write(photo.file.read())
+        while chunk := photo.file.read(CHUNK_SIZE):
+            size += len(chunk)
+            if size > MAX_UPLOAD_BYTES:
+                out.close()
+                destination.unlink(missing_ok=True)
+                raise HTTPException(status_code=413, detail="Photo exceeds 8MB limit")
+            out.write(chunk)
     return str(destination)
 
 

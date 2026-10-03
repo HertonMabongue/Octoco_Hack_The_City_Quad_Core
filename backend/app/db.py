@@ -68,6 +68,13 @@ def init_db() -> None:
             )
             """
         )
+        # Every read query filters/sorts by device_id, so the default
+        # rowid-only index isn't enough once more than a couple of devices
+        # are reporting — these keep the latest-per-device join, the
+        # history lookup, and the alert dedupe check off a full table scan.
+        con.execute("CREATE INDEX IF NOT EXISTS idx_readings_device_id ON readings(device_id, id)")
+        con.execute("CREATE INDEX IF NOT EXISTS idx_alerts_device_type ON alerts(device_id, type, created_at)")
+
         con.execute(
             """
             CREATE TABLE IF NOT EXISTS reports (

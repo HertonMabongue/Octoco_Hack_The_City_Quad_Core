@@ -36,5 +36,9 @@ export function fillStatus(fillPct: number): BinStatus {
 // never hardcode an IP here, it'll be wrong the moment anyone changes wifi.
 export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
+// Canonical deployed URL, used for metadataBase / OpenGraph / sitemap.
+// Override with NEXT_PUBLIC_SITE_URL if the Vercel domain changes.
+export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://kleanclorridor.vercel.app";
+
 // Default map center: roughly the Adam Tas Corridor, Stellenbosch.
 export const DEFAULT_MAP_CENTER: [number, number] = [-33.9346, 18.8653];
