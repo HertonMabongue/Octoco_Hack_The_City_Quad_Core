@@ -19,6 +19,11 @@ Window 2 (the forecast service, pointed at the demo database):
 
 Then open http://localhost:8001/dashboard and choose "15 minutes".
 
+It also writes made-up littering reports in a few clusters around the
+corridor, each with a waste type, so the heatmap page
+(http://localhost:8001/hotspots/map) has something to show. Their notes
+start with "[simulated]".
+
 The three bins are given different behaviour so every state shows up:
 a bin filling steadily, a busy bin close to its threshold, and a quiet
 one. Fill depends on the people count, so fill per visit is meaningful
@@ -33,6 +38,7 @@ import random
 import sqlite3
 import sys
 import time
+import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -47,6 +53,20 @@ BINS = {
     "bin-02": {"start": 55.0, "base": 0.05, "per_person": 0.13, "people": 3.0},
     "bin-03": {"start": 8.0, "base": 0.05, "per_person": 0.10, "people": 1.5},
 }
+# Made-up littering reports: (centre lat, centre lng, how many, waste types).
+# One cluster far from any bin, one beside a bin, one of dumped rubble,
+# plus a few scattered single reports.
+REPORT_CLUSTERS = [
+    (-33.9310, 18.8600, 8, ["household", "household", "recyclables", "paper"]),
+    (-33.9339, 18.8664, 6, ["overflowing_bin", "recyclables", "recyclables"]),
+    (-33.9385, 18.8690, 5, ["rubble"]),
+]
+SCATTERED_REPORTS = [
+    (-33.9322, 18.8641, "garden"), (-33.9366, 18.8612, "household"),
+    (-33.9351, 18.8702, "recyclables"), (-33.9298, 18.8668, "paper"),
+]
+REPORT_SPREAD_DEG = 0.00025   # about 25 m
+
 SENSOR_NOISE_PCT = 0.3
 EMPTY_AT_PCT = 97.0     # a "collection" happens once a bin gets this full
 
@@ -84,6 +104,37 @@ class Simulator:
         self.con.commit()
 
 
+def seed_reports(con: sqlite3.Connection) -> int:
+    """Writes the made-up reports and their waste types. Returns how many."""
+    from app.machine_learning import hotspots  # noqa: E402  (needs DB_PATH set first)
+
+    con.execute("DELETE FROM reports")
+    label_con = hotspots._labels_connection()
+    label_con.execute("DELETE FROM report_labels")
+    label_con.execute("DELETE FROM ml_reports")
+    label_con.commit()
+    label_con.close()
+
+    now = datetime.now(timezone.utc)
+    rows = []
+    for lat, lng, count, types in REPORT_CLUSTERS:
+        for _ in range(count):
+            rows.append((lat + random.gauss(0, REPORT_SPREAD_DEG),
+                         lng + random.gauss(0, REPORT_SPREAD_DEG), random.choice(types)))
+    rows += SCATTERED_REPORTS
+
+    for lat, lng, waste_type in rows:
+        report_id = str(uuid.uuid4())
+        created = now - timedelta(hours=random.uniform(1, 72))
+        con.execute(
+            "INSERT INTO reports(id, lat, lng, note, photo_path, created_at) VALUES (?, ?, ?, ?, NULL, ?)",
+            (report_id, lat, lng, "[simulated] littering report", created.isoformat()),
+        )
+        hotspots.save_label(report_id, waste_type, None, "simulated")
+    con.commit()
+    return len(rows)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Seed a demo database with made-up bin readings.")
     parser.add_argument("--db", default=str(DEFAULT_DB), help="demo database file (default: backend/demo.sqlite3)")
@@ -112,6 +163,7 @@ def main() -> None:
     for i in range(args.backfill, 0, -1):
         sim.step(now - timedelta(seconds=args.interval * i))
     print(f"Wrote {args.backfill} past readings for each of {len(BINS)} bins to {db_path}")
+    print(f"Wrote {seed_reports(con)} made-up littering reports for the heatmap")
 
     if args.once:
         return

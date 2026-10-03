@@ -129,6 +129,68 @@ The clock times are the latest reading's timestamp plus the forecast
 hours, in the same timezone as the stored readings (UTC). Convert to
 local time when displaying them.
 
+## Litter reports: photo to recommendation
+
+The second part of this layer turns residents' photos into advice for
+the city:
+
+```
+photo -> is it waste? (classifier.py) -> where was it taken?
+      -> pin on the map -> heatmap -> clusters of reports (hotspots.py)
+      -> "add a bin", "add staff" or "send a clean-up crew"
+```
+
+Open http://localhost:8001/hotspots/map. The page shows the heatmap, the
+bins, each problem area with its recommendation, and a form to send a
+photo report.
+
+| File | Purpose |
+|---|---|
+| `classifier.py` | Pretrained image model (CLIP, zero-shot): waste or not, and which type |
+| `hotspots.py` | Reads reports, clusters them with DBSCAN, and applies the recommendation rules |
+| `hotspots.html` | The map page |
+| `static/` | Leaflet and its heatmap plugin (BSD-2 licences included) |
+| `requirements-vision.txt` | Extra packages for the photo model |
+
+### How each step works
+
+- **Waste or not:** the model scores the photo against short text
+  descriptions ("household rubbish bags dumped on the ground", "a clean
+  street with no rubbish", and so on). A photo that best matches the
+  no-waste description is rejected and never pinned.
+- **Location:** the photo's own geotag if it has one, otherwise the
+  browser's location or a point clicked on the map. Many phones strip
+  geotags on upload, which is why the fallback exists.
+- **Hotspots:** DBSCAN groups reports within about 80 m of each other. A
+  group of 3 or more is a problem area.
+- **Recommendation:** mostly rubble means a clean-up crew. No bin within
+  150 m means add a bin. A bin nearby but reports anyway means more
+  staff or more frequent collection. The thresholds are constants at the
+  top of `hotspots.py`.
+
+It reads the community app's reports from the backend database
+(read-only) as well as reports sent through its own form. Classifications
+and its own reports live in `backend/ml_labels_<database>.sqlite3`. Photos
+sent through the form are deleted after classification.
+
+### Installing the photo model
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -r backend\app\machine_learning\requirements-vision.txt
+```
+
+This is a large install, and the model downloads about 600 MB the first
+time a photo is classified. Without it everything else works, and photos
+are pinned as "Not classified". Try the model on one photo at
+http://localhost:8001/docs under `POST /classify`.
+
+### Limits
+
+- **The model is untested here.** It was written without access to the
+  model download, so check it on real photos before relying on it.
+- **Reports show where people report,** not where all the litter is.
+- **The recommendation rules are simple thresholds,** not learned.
+
 ## Showing it on the dashboard
 
 Two options, both for whoever owns those files to decide:

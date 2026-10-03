@@ -9,6 +9,10 @@ main backend stores and serves:
     GET /forecast/series                        the same rows plus fill history, for charts
     GET /forecast/placement?visitsPerHour=120   bin-placement estimate
     GET /dashboard                              a live forecast chart page (dashboard.html)
+    GET /hotspots                               littering reports, hotspots and recommendations
+    GET /hotspots/map                           the heatmap page (hotspots.html)
+    POST /reports                               photo + location -> waste or not -> pin on the map
+    POST /classify                              classify one uploaded photo (to try the model)
     GET /health
 
 Run from the repo root (main backend on :8000, this on :8001):
@@ -29,16 +33,24 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Literal
 
-from fastapi import FastAPI, Query
+import tempfile
+
+from fastapi import FastAPI, File, Form, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from app.config import DEVICE_REGISTRY, device_info, get_settings
-from app.machine_learning import data, model
+from app.machine_learning import classifier, data, hotspots, model
 
 app = FastAPI(title="Clean Corridor: fill forecast (machine learning layer)")
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["GET"], allow_headers=["*"])
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["GET", "POST"], allow_headers=["*"])
+
+HERE = Path(__file__).resolve().parent
+# Leaflet and its heatmap plugin are bundled in static/ so the map page
+# doesn't depend on a CDN.
+app.mount("/static", StaticFiles(directory=HERE / "static"), name="static")
 
 # How far ahead "collect soon" looks. Real bins fill over hours, so the
 # default is 2 h; the mock bins fill in minutes, so use a few minutes
@@ -183,25 +195,156 @@ def get_forecast_series(
 def dashboard() -> FileResponse:
     """The live forecast chart page. Open it directly, or embed it in the
     main dashboard with an iframe."""
-    return FileResponse(Path(__file__).resolve().parent / "dashboard.html", media_type="text/html")
+    return FileResponse(HERE / "dashboard.html", media_type="text/html")
 
 
-@app.get("/forecast/placement", response_model=PlacementEstimate)
-def get_placement_estimate(
-    visits_per_hour: float = Query(..., alias="visitsPerHour", ge=0),
-) -> PlacementEstimate:
-    settings = get_settings()
-    histories = [
-        data.history_with_traffic(device_id, settings.max_history_points)
-        for device_id in sorted(DEVICE_REGISTRY)
-    ]
-    result = model.estimate_for_footfall(histories, visits_per_hour, settings.fill_critical_pct)
-    return PlacementEstimate(
-        status=result["status"],
-        visitsPerHour=visits_per_hour,
-        fillPctPerHour=_round(result.get("rate_pct_per_hour"), 1),
-        fillPerVisitPct=_round(result.get("fill_per_visit_pct"), 3),
-        hoursToThreshold=_round(result.get("hours")),
-        hoursLow=_round(result.get("hours_low")),
-        hoursHigh=_round(result.get("hours_high")),
-    )
+# ---------- Littering reports: classification, hotspots, recommendations ----------
+
+
+@app.get("/hotspots")
+def get_hotspots() -> dict:
+    """Residents' unresolved reports with a waste type each, the hotspots
+    they cluster into, and what the city should do about each hotspot."""
+    reports = hotspots.labelled_reports()
+    found = hotspots.find_hotspots(reports)
+    actions = [h["action"] for h in found]
+    return {
+        "classifierInstalled": classifier.installed(),
+        "summary": {
+            "reports": len(reports),
+            "hotspots": len(found),
+            "addBin": actions.count("add_bin"),
+            "moreStaff": actions.count("more_staff"),
+            "cleanupCrew": actions.count("cleanup_crew"),
+        },
+        "hotspots": [
+            {
+                "id": h["id"],
+                "lat": h["lat"],
+                "lng": h["lng"],
+                "count": h["count"],
+                "dominantType": h["dominant_type"],
+                "dominantLabel": h["dominant_label"],
+                "types": h["types"],
+                "recyclableShare": round(h["recyclable_share"], 2),
+                "nearestBin": h["nearest_bin"],
+                "nearestBinM": _round(h["nearest_bin_m"], 0),
+                "latestReport": h["latest_report"],
+                "action": h["action"],
+                "title": h["title"],
+                "reason": h["reason"],
+            }
+            for h in found
+        ],
+        "reports": [
+            {
+                "id": r["id"],
+                "lat": r["lat"],
+                "lng": r["lng"],
+                "type": r["type"],
+                "typeLabel": r["type_label"],
+                "confidence": _round(r["confidence"]),
+                "createdAt": r["created_at"],
+                "hotspot": r["hotspot"],
+                "simulated": bool(r["note"] and r["note"].startswith("[simulated]")),
+                "source": r["label_source"],
+            }
+            for r in reports
+        ],
+        "bins": [
+            {"id": device_id, "label": info.label, "lat": info.lat, "lng": info.lng}
+            for device_id, info in sorted(DEVICE_REGISTRY.items())
+        ],
+    }
+
+
+@app.get("/hotspots/map", include_in_schema=False)
+def hotspots_map() -> FileResponse:
+    return FileResponse(HERE / "hotspots.html", media_type="text/html")
+
+
+async def _save_upload(photo: UploadFile) -> str:
+    suffix = Path(photo.filename or "photo.jpg").suffix or ".jpg"
+    with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+        tmp.write(await photo.read())
+        return tmp.name
+
+
+@app.post("/reports")
+async def submit_report(
+    photo: UploadFile = File(...),
+    lat: float | None = Form(default=None),
+    lng: float | None = Form(default=None),
+) -> dict:
+    """The whole pipeline for one photo: classify it (waste or not), find
+    where it was taken, and pin it on the map if it shows waste.
+
+    Location comes from the photo's own geotag when it has one, otherwise
+    from the lat/lng sent with it (the browser's location, or a point the
+    person picked on the map). The photo is deleted straight after
+    classification: only the waste type and location are kept.
+    """
+    tmp_path = await _save_upload(photo)
+    try:
+        result = classifier.classify(tmp_path) if classifier.installed() else None
+        geotag = classifier.photo_location(tmp_path)
+    finally:
+        Path(tmp_path).unlink(missing_ok=True)
+
+    if geotag is not None:
+        lat, lng, location_source = geotag[0], geotag[1], "photo geotag"
+    elif lat is not None and lng is not None:
+        location_source = "location sent with the photo"
+    else:
+        raise HTTPException(422, "No location: the photo has no geotag and no lat/lng was sent.")
+
+    if result is not None and not result["is_waste"]:
+        return {
+            "accepted": False,
+            "isWaste": False,
+            "typeLabel": result["label"],
+            "confidence": round(result["confidence"], 2),
+            "message": "No waste found in this photo, so it wasn't added to the map.",
+        }
+
+    waste_type = result["type"] if result else "unclassified"
+    confidence = result["confidence"] if result else None
+    report_id = hotspots.add_report(lat, lng, waste_type, confidence)
+    return {
+        "accepted": True,
+        "id": report_id,
+        "isWaste": True if result else None,
+        "type": waste_type,
+        "typeLabel": hotspots.TYPE_LABELS.get(waste_type, waste_type),
+        "confidence": _round(confidence),
+        "lat": lat,
+        "lng": lng,
+        "locationSource": location_source,
+        "message": (
+            "Added to the map." if result
+            else "Added to the map, but not checked: the photo model isn't installed."
+        ),
+    }
+
+
+@app.post("/classify")
+async def classify_photo(photo: UploadFile = File(...)) -> dict:
+    """Classify one uploaded photo. For trying the model out; nothing is stored."""
+    if not classifier.installed():
+        raise HTTPException(503, "The photo model isn't installed. See requirements-vision.txt.")
+    tmp_path = await _save_upload(photo)
+    try:
+        result = classifier.classify(tmp_path)
+    finally:
+        Path(tmp_path).unlink(missing_ok=True)
+    if result is None:
+        raise HTTPException(422, classifier.load_error() or "That file couldn't be read as a photo.")
+    return {
+        "isWaste": result["is_waste"],
+        "wasteProbability": round(result["waste_probability"], 2),
+        "type": result["type"],
+        "label": result["label"],
+        "confidence": round(result["confidence"], 2),
+        "recyclable": result["recyclable"],
+        "scores": {k: round(v, 3) for k, v in sorted(result["scores"].items(), key=lambda kv: -kv[1])},
+    }
