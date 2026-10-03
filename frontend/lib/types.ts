@@ -55,3 +55,30 @@ export interface ReportResult {
   id: string;
   status: ReportStatus;
 }
+
+// A stored community report, for the municipal dashboard's incident log
+// (app/dashboard/library). Distinct from ReportInput/ReportResult above,
+// which are the submit-time shapes the community app uses.
+export interface ReportRecord {
+  id: string;
+  lat: number | null;
+  lng: number | null;
+  note: string | null;
+  photoUrl: string | null;
+  createdAt: string;
+  resolved: boolean;
+}
+
+export type RiskLevel = "low" | "medium" | "high";
+export type ForecastSource = "heuristic" | "model";
+
+// One bin's projected time to needing collection (app/dashboard/insights).
+// `source` distinguishes today's naive projection from the real model in
+// backend/app/forecasting/ once it's trained — same shape either way.
+export interface ForecastPoint {
+  binId: string;
+  label: string;
+  predictedFullInHours: number | null;
+  riskLevel: RiskLevel;
+  source: ForecastSource;
+}

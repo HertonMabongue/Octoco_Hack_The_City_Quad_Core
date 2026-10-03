@@ -84,15 +84,18 @@ offline if it stops reporting for `OFFLINE_AFTER_S` (default 90s).
 
 CamelCase everywhere; `backend/app/models.py` is the source of truth, mirrored in `frontend/lib/types.ts`.
 
-| Method | Path                      | Description                                        |
-| ------ | ------------------------- | -------------------------------------------------- |
-| GET    | `/api/bins`               | All bins, derived from latest telemetry + status   |
-| GET    | `/api/bins/:id`           | One bin                                            |
-| GET    | `/api/bins/:id/history`   | Fill-level history                                 |
-| GET    | `/api/alerts`             | Active alerts (resolved ones hidden by default)    |
-| POST   | `/api/alerts/:id/resolve` | Mark an alert resolved                             |
-| POST   | `/api/reports`            | Multipart: `lat`, `lng`, `note`, `photo`           |
-| GET    | `/health`                 | Liveness + per-device city broker connection state |
+| Method | Path                       | Description                                                  |
+| ------ | -------------------------- | ------------------------------------------------------------ |
+| GET    | `/api/bins`                | All bins, derived from latest telemetry + status             |
+| GET    | `/api/bins/:id`            | One bin                                                      |
+| GET    | `/api/bins/:id/history`    | Fill-level history                                           |
+| GET    | `/api/alerts`              | Active alerts (resolved ones hidden by default)              |
+| POST   | `/api/alerts/:id/resolve`  | Mark an alert resolved                                       |
+| POST   | `/api/reports`             | Multipart: `lat`, `lng`, `note`, `photo`                     |
+| GET    | `/api/reports`             | All community reports (resolved included)                    |
+| POST   | `/api/reports/:id/resolve` | Mark a report resolved                                       |
+| GET    | `/api/forecast`            | Per-bin projected time to collection (see Forecasting below) |
+| GET    | `/health`                  | Liveness + per-device city broker connection state           |
 
 `Bin.status` (`good`/`warning`/`critical`) is derived from `fillPct`
 against `FILL_WARNING_PCT`/`FILL_CRITICAL_PCT` — tune in
@@ -101,15 +104,19 @@ against `FILL_WARNING_PCT`/`FILL_CRITICAL_PCT` — tune in
 The frontend falls back to mock data if the backend is unreachable, so
 either side works standalone.
 
-## For Quick Start
+## Quick start
 
 ```bash
-./start.sh
+./start.sh          # macOS/Linux, or Windows via Git Bash/WSL
 ```
 
-Manages its own `.venv`, installs both sides' deps if missing, seeds
-`.env`/`.env.local`, runs backend (`:8000`) + frontend (`:3000`)
-together. Ctrl+C stops both.
+```powershell
+.\start.ps1          # Windows PowerShell, no bash required
+```
+
+Either one manages its own `.venv`, installs both sides' deps if
+missing, seeds `.env`/`.env.local`, and runs backend (`:8000`) +
+frontend (`:3000`) together. Ctrl+C stops both.
 
 <details>
 <summary>Running each part by hand</summary>
@@ -134,7 +141,7 @@ backend/
     city_client.py        Speaks the city MQTT protocol (+ HTTP fallback)
     mock_generator.py     Generates readings until firmware is posting
     watchdog.py             Marks stale devices offline
-    routers/                 bins, alerts, reports, ingest
+    routers/                 bins, alerts, reports, ingest, forecast
     forecasting/              Fill-rate prediction model — scaffolded,
                                not built; see its README before starting
 ```
@@ -159,12 +166,12 @@ use the bin's sensor readings to act before a problem happens instead of
 after. Every bin already stores four independent signals in the `readings`
 table, so there is more than one thing worth predicting:
 
-| Signal (column) | Sensor | Possible model |
-| --- | --- | --- |
-| `fill_pct`, `distance_cm` | Ultrasonic | Regression on fill history → **time-to-full**, so collection is scheduled before overflow |
-| `people_count` | PIR | Foot-traffic profile by hour/day → adjusts the fill rate (a busy bin fills faster) and improves the time-to-full estimate |
-| `gas_raw` | Gas | Trend / anomaly detection → early **hazard** warning, before `GAS_ALERT_RAW` is crossed |
-| `movement_alert` | Accelerometer | Anomaly detection on tamper/knock events → separates a bin being emptied or moved from possible theft |
+| Signal (column)           | Sensor        | Possible model                                                                                                            |
+| ------------------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `fill_pct`, `distance_cm` | Ultrasonic    | Regression on fill history → **time-to-full**, so collection is scheduled before overflow                                 |
+| `people_count`            | PIR           | Foot-traffic profile by hour/day → adjusts the fill rate (a busy bin fills faster) and improves the time-to-full estimate |
+| `gas_raw`                 | Gas           | Trend / anomaly detection → early **hazard** warning, before `GAS_ALERT_RAW` is crossed                                   |
+| `movement_alert`          | Accelerometer | Anomaly detection on tamper/knock events → separates a bin being emptied or moved from possible theft                     |
 
 Time-to-full is the headline model; the others are extensions, and they can
 also feed it as extra features. Which of these gets built is up to whoever
@@ -174,3 +181,13 @@ you begin.
 > **Heads up:** `app.db.history()` currently returns only `ts` and
 > `fill_pct`. Anything that uses the other sensors needs that query widened
 > (or a new function next to it) to return the extra columns.
+
+Until the real model lands, `backend/app/routers/forecast.py` serves `GET
+/api/forecast` from a naive linear projection over that same `fill_pct`
+history — the same "mock it until it's real" move as `mock_generator.py`
+for telemetry, so the dashboard's Insights page already has something real
+to show. Every forecast point carries `source: "heuristic"`; swapping the
+real model in only means changing that one field to `"model"` and the
+projection itself — the response shape (`ForecastPoint` in `models.py` /
+`types.ts`) doesn't change, so the frontend needs no updates when the real
+model replaces the heuristic.

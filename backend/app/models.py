@@ -55,3 +55,38 @@ class Alert(CamelModel):
 class ReportResult(CamelModel):
     id: str
     status: Literal["queued", "received"]
+
+
+class Report(CamelModel):
+    """A community littering report, for the municipal dashboard's
+    incident log (see routers/reports.py GET + resolve, and
+    app/library/ReportsTable on the frontend). Mirrors the `reports`
+    table in db.py field-for-field.
+    """
+
+    id: str
+    lat: float | None = None
+    lng: float | None = None
+    note: str | None = None
+    photo_url: str | None = Field(default=None, alias="photoUrl")
+    created_at: str = Field(alias="createdAt")
+    resolved: bool = False
+
+
+RiskLevel = Literal["low", "medium", "high"]
+ForecastSource = Literal["heuristic", "model"]
+
+
+class ForecastPoint(CamelModel):
+    """One bin's projected time to needing collection. `source` is
+    "heuristic" until app/forecasting/'s real model is trained (see its
+    README) — the frontend labels the two differently, but the shape
+    never changes, so swapping the implementation in routers/forecast.py
+    is the only change the handoff needs.
+    """
+
+    bin_id: str = Field(alias="binId")
+    label: str
+    predicted_full_in_hours: float | None = Field(default=None, alias="predictedFullInHours")
+    risk_level: RiskLevel = Field(alias="riskLevel")
+    source: ForecastSource = "heuristic"

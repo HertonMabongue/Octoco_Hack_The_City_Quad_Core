@@ -49,3 +49,56 @@ export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://kleanclorri
 
 // Default map center: roughly the Adam Tas Corridor, Stellenbosch.
 export const DEFAULT_MAP_CENTER: [number, number] = [-33.9346, 18.8653];
+
+// Insights page (app/dashboard/insights) cost-savings estimate. A fixed
+// collection schedule sends a truck to every registered bin this many
+// times a week regardless of fill level; comparing that to how many
+// bins actually need collection is what turns the forecast into a
+// savings figure instead of just a number of trips. Both constants are
+// placeholder assumptions, stated on the page itself rather than buried
+// in code, so tune them to the municipality's real schedule and
+// per-trip cost rather than trusting the default.
+export const FIXED_SCHEDULE_VISITS_PER_WEEK = 2;
+export const ASSUMED_COST_PER_TRIP_ZAR = 450;
+
+export const RISK_LABELS: Record<"low" | "medium" | "high", string> = {
+  low: "Low",
+  medium: "Medium",
+  high: "High",
+};
+
+// Static asset metadata for the Library's bin registry
+// (app/dashboard/library) — install date and sensor loadout aren't part
+// of the live telemetry contract (backend/app/models.py's Bin), so
+// they're kept here rather than invented fields on that model. Once
+// there's a real asset database behind the registry, this becomes its
+// seed data instead of a frontend constant.
+export interface BinAssetInfo {
+  installedAt: string;
+  sensors: string[];
+  firmware: string;
+}
+
+export const BIN_ASSET_INFO: Record<string, BinAssetInfo> = {
+  "bin-01": {
+    installedAt: "2026-07-14",
+    sensors: ["Ultrasonic (HC-SR04)", "Gas (MQ-series)", "PIR motion", "Accelerometer"],
+    firmware: "OctocoEsp32Project v1.2",
+  },
+  "bin-02": {
+    installedAt: "2026-07-14",
+    sensors: ["Ultrasonic (HC-SR04)", "Gas (MQ-series)", "PIR motion", "Accelerometer"],
+    firmware: "OctocoEsp32Project v1.2",
+  },
+  "bin-03": {
+    installedAt: "2026-08-02",
+    sensors: ["Ultrasonic (HC-SR04)", "Gas (MQ-series)", "PIR motion", "Accelerometer"],
+    firmware: "OctocoEsp32Project v1.2",
+  },
+};
+
+export const DEFAULT_BIN_ASSET_INFO: BinAssetInfo = {
+  installedAt: "Unregistered",
+  sensors: ["Ultrasonic (HC-SR04)", "Gas (MQ-series)", "PIR motion", "Accelerometer"],
+  firmware: "OctocoEsp32Project v1.2",
+};

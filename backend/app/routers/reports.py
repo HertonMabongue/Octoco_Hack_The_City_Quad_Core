@@ -6,11 +6,11 @@ from __future__ import annotations
 import uuid
 from pathlib import Path
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile
 
 from app import db
 from app.config import get_settings
-from app.models import ReportResult
+from app.models import Report, ReportResult
 
 router = APIRouter(prefix="/api/reports", tags=["reports"])
 
@@ -44,6 +44,45 @@ def _save_photo(photo: UploadFile) -> str | None:
                 raise HTTPException(status_code=413, detail="Photo exceeds 8MB limit")
             out.write(chunk)
     return str(destination)
+
+
+def _photo_url(photo_path: str | None) -> str | None:
+    # Stored as an absolute filesystem path (see _save_photo above); the
+    # static mount in main.py serves settings.upload_dir at /uploads, so
+    # only the filename carries over into the public URL.
+    return f"/uploads/{Path(photo_path).name}" if photo_path else None
+
+
+def _to_report(row: dict) -> Report:
+    return Report(
+        id=row["id"],
+        lat=row["lat"],
+        lng=row["lng"],
+        note=row["note"],
+        photoUrl=_photo_url(row["photo_path"]),
+        createdAt=row["created_at"],
+        resolved=row["resolved"],
+    )
+
+
+@router.get("", response_model=list[Report])
+def list_reports(
+    limit: int = Query(100, ge=1, le=500),
+    include_resolved: bool = Query(True),
+) -> list[Report]:
+    rows = db.list_reports(limit, include_resolved=include_resolved)
+    return [_to_report(row) for row in rows]
+
+
+@router.post("/{report_id}/resolve", response_model=Report)
+def resolve_report(report_id: str) -> Report:
+    if not db.resolve_report(report_id):
+        raise HTTPException(status_code=404, detail="Report not found")
+
+    rows = db.list_reports(limit=500, include_resolved=True)
+    row = next((r for r in rows if r["id"] == report_id), None)
+    assert row is not None  # just resolved it above, so it exists
+    return _to_report(row)
 
 
 @router.post("", response_model=ReportResult)

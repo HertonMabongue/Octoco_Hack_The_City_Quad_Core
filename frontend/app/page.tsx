@@ -97,7 +97,7 @@ export default function HomePage() {
                   <dt className="flex items-center gap-2 text-[#ff8b6a]">
                     <Flame className="h-3.5 w-3.5" /> gas (raw)
                   </dt>
-                  <dd className="text-[#ff8b6a]">890 — hazard</dd>
+                  <dd className="text-[#ff8b6a]">890 (hazard)</dd>
                 </div>
                 <div className="flex items-center justify-between">
                   <dt className="flex items-center gap-2 text-[#9fd6ad]">

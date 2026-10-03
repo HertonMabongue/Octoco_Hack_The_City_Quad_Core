@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import AlertFeed from "@/components/dashboard/AlertFeed";
 import AutoRefresh from "@/components/dashboard/AutoRefresh";
 import BinList from "@/components/dashboard/BinList";
+import StatTiles from "@/components/dashboard/StatTiles";
 import BinMapLoader from "@/components/map/BinMapLoader";
 import MapLegend from "@/components/map/MapLegend";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -26,6 +27,10 @@ export default async function DashboardPage() {
           </p>
         </div>
         <AutoRefresh />
+      </div>
+
+      <div className="mt-4">
+        <StatTiles bins={bins} alerts={alerts} />
       </div>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[1.4fr_1fr]">

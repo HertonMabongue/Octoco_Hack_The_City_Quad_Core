@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import BinsSummaryStrip from "@/components/community/BinsSummaryStrip";
 import BinMapLoader from "@/components/map/BinMapLoader";
 import MapLegend from "@/components/map/MapLegend";
 import { Badge } from "@/components/ui/badge";
@@ -31,7 +32,11 @@ export default async function CommunityPage() {
         </Button>
       </div>
 
-      <div className="mt-6 h-72 min-w-0 sm:h-96">
+      <div className="mt-3">
+        <BinsSummaryStrip bins={bins} />
+      </div>
+
+      <div className="mt-4 h-72 min-w-0 sm:h-96">
         <BinMapLoader bins={bins} />
       </div>
       <div className="mt-2">
@@ -41,16 +46,31 @@ export default async function CommunityPage() {
       {bins.length === 0 ? (
         <p className="mt-6 text-sm text-muted-foreground">No bins reporting yet.</p>
       ) : (
-        <ul className="mt-6 divide-y divide-border">
-          {bins.map((bin) => (
-            <li key={bin.id} className="flex items-center justify-between py-3 text-sm">
-              {bin.label}
-              <Badge variant={bin.status} dot>
-                {STATUS_LABELS[bin.status]}
-              </Badge>
-            </li>
-          ))}
-        </ul>
+        <div className="mt-6 overflow-hidden rounded-lg border border-border">
+          <ul className="divide-y divide-border">
+            {bins.map((bin, i) => (
+              <li
+                key={bin.id}
+                className={`flex items-center gap-4 px-4 py-3 text-sm ${i % 2 ? "bg-secondary/30" : ""}`}
+              >
+                <span className="min-w-0 flex-1 font-medium">{bin.label}</span>
+                <div className="hidden h-1.5 w-24 shrink-0 overflow-hidden rounded-full bg-secondary sm:block">
+                  <div
+                    className="h-full rounded-full bg-[hsl(var(--status-good))] data-[status=critical]:bg-[hsl(var(--status-critical))] data-[status=warning]:bg-[hsl(var(--status-warning))]"
+                    data-status={bin.status}
+                    style={{ width: `${bin.fillPct}%` }}
+                  />
+                </div>
+                <span className="w-10 shrink-0 text-right font-mono text-xs text-muted-foreground">
+                  {bin.fillPct}%
+                </span>
+                <Badge variant={bin.status} dot className="shrink-0">
+                  {STATUS_LABELS[bin.status]}
+                </Badge>
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
     </div>
   );

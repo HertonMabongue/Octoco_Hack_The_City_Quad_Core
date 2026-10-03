@@ -1,5 +1,13 @@
-import { API_URL } from "./constants";
-import type { Alert, Bin, BinHistoryPoint, ReportInput, ReportResult } from "./types";
+import { API_URL, FILL_THRESHOLDS } from "./constants";
+import type {
+  Alert,
+  Bin,
+  BinHistoryPoint,
+  ForecastPoint,
+  ReportInput,
+  ReportRecord,
+  ReportResult,
+} from "./types";
 
 // Every network call the frontend makes goes through this file.
 // Each function tries the real backend first; if it's not reachable yet
@@ -63,7 +71,7 @@ const MOCK_ALERTS: Alert[] = [
     id: "a1",
     binId: "bin-03",
     type: "overflow",
-    message: "Bin 93% full — needs collection",
+    message: "Bin 93% full, needs collection",
     createdAt: new Date().toISOString(),
     resolved: false,
   },
@@ -71,7 +79,7 @@ const MOCK_ALERTS: Alert[] = [
     id: "a2",
     binId: "bin-03",
     type: "hazard",
-    message: "Bin bin-03 gas reading at 890 — possible hazard",
+    message: "Bin bin-03 gas reading at 890, possible hazard",
     createdAt: new Date().toISOString(),
     resolved: false,
   },
@@ -79,7 +87,7 @@ const MOCK_ALERTS: Alert[] = [
     id: "a3",
     binId: "bin-03",
     type: "tamper",
-    message: "Bin bin-03 unusual movement detected — possible tamper/theft",
+    message: "Bin bin-03 unusual movement detected, possible tamper or theft",
     createdAt: new Date().toISOString(),
     resolved: false,
   },
@@ -90,6 +98,27 @@ const MOCK_ALERTS: Alert[] = [
     message: "Community report: littering nearby",
     createdAt: new Date().toISOString(),
     resolved: false,
+  },
+];
+
+const MOCK_REPORTS: ReportRecord[] = [
+  {
+    id: "r1",
+    lat: -33.9349,
+    lng: 18.8657,
+    note: "Overflowing bin spilling onto the sidewalk near the crossing.",
+    photoUrl: null,
+    createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+    resolved: false,
+  },
+  {
+    id: "r2",
+    lat: -33.9341,
+    lng: 18.8649,
+    note: "Dumped building rubble behind the parking area.",
+    photoUrl: null,
+    createdAt: new Date(Date.now() - 26 * 60 * 60 * 1000).toISOString(),
+    resolved: true,
   },
 ];
 
@@ -132,6 +161,36 @@ export async function getAlerts(): Promise<Alert[]> {
 
 export async function resolveAlert(id: string): Promise<Alert | null> {
   return safeFetch<Alert>(`/api/alerts/${id}/resolve`, { method: "POST" });
+}
+
+export async function getReports(): Promise<ReportRecord[]> {
+  const data = await safeFetch<ReportRecord[]>("/api/reports");
+  return data ?? MOCK_REPORTS;
+}
+
+export async function resolveReport(id: string): Promise<ReportRecord | null> {
+  return safeFetch<ReportRecord>(`/api/reports/${id}/resolve`, { method: "POST" });
+}
+
+export async function getForecast(): Promise<ForecastPoint[]> {
+  const data = await safeFetch<ForecastPoint[]>("/api/forecast");
+  if (data) return data;
+
+  // Mirrors the backend's own heuristic (routers/forecast.py) against
+  // MOCK_BINS, rather than a separate mock shape, so Insights looks the
+  // same whether or not the backend is reachable.
+  const ASSUMED_PCT_PER_HOUR = 3; // roughly matches mock_generator.py's random walk
+  return MOCK_BINS.map((bin) => {
+    const remaining = FILL_THRESHOLDS.critical - bin.fillPct;
+    const hours = remaining > 0 ? Math.round((remaining / ASSUMED_PCT_PER_HOUR) * 10) / 10 : 0;
+    return {
+      binId: bin.id,
+      label: bin.label,
+      predictedFullInHours: hours,
+      riskLevel: hours <= 12 ? "high" : hours <= 48 ? "medium" : "low",
+      source: "heuristic",
+    };
+  });
 }
 
 export async function submitReport({ lat, lng, note, photo }: ReportInput): Promise<ReportResult> {

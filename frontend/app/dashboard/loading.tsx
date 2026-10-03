@@ -6,6 +6,12 @@ export default function DashboardLoading() {
       <Skeleton className="h-8 w-56" />
       <Skeleton className="mt-2 h-4 w-72" />
 
+      <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <Skeleton key={i} className="h-[72px] w-full" />
+        ))}
+      </div>
+
       <div className="mt-6 grid gap-6 lg:grid-cols-[1.4fr_1fr]">
         <Skeleton className="h-[420px] w-full" />
         <Skeleton className="h-[420px] w-full" />

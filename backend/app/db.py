@@ -100,10 +100,18 @@ def init_db() -> None:
               lng REAL,
               note TEXT,
               photo_path TEXT,
-              created_at TEXT NOT NULL
+              created_at TEXT NOT NULL,
+              resolved INTEGER NOT NULL DEFAULT 0
             )
             """
         )
+        # Same "no ADD COLUMN IF NOT EXISTS" migration as alerts.resolved
+        # above — lets the municipal dashboard's incident log (see
+        # routers/reports.py) mark a report handled without a fresh DB.
+        existing_report_columns = {row[1] for row in con.execute("PRAGMA table_info(reports)").fetchall()}
+        if "resolved" not in existing_report_columns:
+            con.execute("ALTER TABLE reports ADD COLUMN resolved INTEGER NOT NULL DEFAULT 0")
+
         con.commit()
 
 
@@ -319,3 +327,39 @@ def insert_report(lat: float | None, lng: float | None, note: str | None, photo_
         )
         con.commit()
     return report_id
+
+
+def list_reports(limit: int, include_resolved: bool = True) -> list[dict[str, Any]]:
+    """Powers the municipal dashboard's incident log (routers/reports.py
+    GET). Resolved reports stay included by default, unlike
+    list_alerts — a closed-out littering report is still useful history
+    for the library, where an operator reviewing past incidents outnumbers
+    one triaging only what's still open.
+    """
+    query = "SELECT id, lat, lng, note, photo_path, created_at, resolved FROM reports"
+    if not include_resolved:
+        query += " WHERE resolved = 0"
+    query += " ORDER BY created_at DESC LIMIT ?"
+
+    with get_connection() as con:
+        rows = con.execute(query, (limit,)).fetchall()
+    return [
+        {
+            "id": r[0],
+            "lat": r[1],
+            "lng": r[2],
+            "note": r[3],
+            "photo_path": r[4],
+            "created_at": r[5],
+            "resolved": bool(r[6]),
+        }
+        for r in rows
+    ]
+
+
+def resolve_report(report_id: str) -> bool:
+    """Marks a report resolved. Returns False if no such report exists."""
+    with get_connection() as con:
+        cursor = con.execute("UPDATE reports SET resolved = 1 WHERE id = ?", (report_id,))
+        con.commit()
+        return cursor.rowcount > 0

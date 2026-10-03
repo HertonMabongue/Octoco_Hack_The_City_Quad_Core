@@ -1,10 +1,16 @@
 import type { Metadata, Viewport } from "next";
-import { Inter } from "next/font/google";
+import { Inter, JetBrains_Mono } from "next/font/google";
 
 import "./globals.css";
 import { SITE_URL } from "@/lib/constants";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
+
+// A dedicated data face for the municipal dashboard's readouts (fill
+// percentages, counts, timestamps) — the same monospace-console
+// language the homepage's device mockup already uses, carried through
+// rather than falling back to the body font for every number.
+const jetbrainsMono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-mono" });
 
 const DESCRIPTION =
   "Live bin fill-level monitoring and community littering reports for the Adam Tas Corridor, Stellenbosch.";
@@ -12,7 +18,7 @@ const DESCRIPTION =
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: "Clean Corridor — Waste Management System",
+    default: "Clean Corridor · Waste Management System",
     template: "%s · Clean Corridor",
   },
   description: DESCRIPTION,
@@ -29,14 +35,14 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     siteName: "Clean Corridor",
-    title: "Clean Corridor — Waste Management System",
+    title: "Clean Corridor · Waste Management System",
     description: DESCRIPTION,
     url: SITE_URL,
     locale: "en_ZA",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Clean Corridor — Waste Management System",
+    title: "Clean Corridor · Waste Management System",
     description: DESCRIPTION,
   },
   robots: {
@@ -66,7 +72,7 @@ const THEME_INIT_SCRIPT = `
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={inter.variable}>
+    <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable}`}>
       <body className="font-sans antialiased">
         {/* eslint-disable-next-line react/no-danger */}
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />

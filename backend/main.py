@@ -15,7 +15,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app import city_client, db, mock_generator, watchdog
 from app.config import get_settings
-from app.routers import alerts, bins, ingest, reports
+from app.routers import alerts, bins, forecast, ingest, reports
 
 # Without this, our own logger.info()/logger.warning() calls across the
 # app are silently dropped — Python's root logger defaults to WARNING
@@ -54,6 +54,7 @@ app.include_router(bins.router)
 app.include_router(alerts.router)
 app.include_router(reports.router)
 app.include_router(ingest.router)
+app.include_router(forecast.router)
 
 
 @app.get("/health", tags=["meta"])
