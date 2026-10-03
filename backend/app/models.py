@@ -43,6 +43,7 @@ class Alert(CamelModel):
     type: Literal["overflow", "littering", "offline"]
     message: str
     created_at: str = Field(alias="createdAt")
+    resolved: bool = False
 
 
 class ReportResult(CamelModel):

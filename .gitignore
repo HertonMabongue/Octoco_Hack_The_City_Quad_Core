@@ -234,9 +234,10 @@ out/
 next-env.d.ts
 *.tsbuildinfo
 
-# Backend local runtime artifacts
-backend/*.sqlite3
-backend/*.db
+# Backend local runtime artifacts — **/ so this still matches if uvicorn
+# is ever run from inside backend/ (DB_PATH then resolves one level deeper)
+backend/**/*.sqlite3
+backend/**/*.db
 backend/uploads/
 
 # Trained forecasting model artifacts — regenerate via train.py, don't commit

@@ -64,10 +64,17 @@ def init_db() -> None:
               device_id TEXT NOT NULL,
               type TEXT NOT NULL,
               message TEXT NOT NULL,
-              created_at TEXT NOT NULL
+              created_at TEXT NOT NULL,
+              resolved INTEGER NOT NULL DEFAULT 0
             )
             """
         )
+        # Migration for DBs created before `resolved` existed — SQLite has
+        # no "ADD COLUMN IF NOT EXISTS", so check first.
+        existing_columns = {row[1] for row in con.execute("PRAGMA table_info(alerts)").fetchall()}
+        if "resolved" not in existing_columns:
+            con.execute("ALTER TABLE alerts ADD COLUMN resolved INTEGER NOT NULL DEFAULT 0")
+
         # Every read query filters/sorts by device_id, so the default
         # rowid-only index isn't enough once more than a couple of devices
         # are reporting — these keep the latest-per-device join, the
@@ -225,16 +232,51 @@ def recent_alert_exists(device_id: str, alert_type: str, within_seconds: int = 9
     return last >= cutoff
 
 
-def list_alerts(limit: int) -> list[dict[str, Any]]:
+def list_alerts(limit: int, include_resolved: bool = False) -> list[dict[str, Any]]:
+    query = "SELECT id, device_id, type, message, created_at, resolved FROM alerts"
+    if not include_resolved:
+        query += " WHERE resolved = 0"
+    query += " ORDER BY created_at DESC LIMIT ?"
+
     with get_connection() as con:
-        rows = con.execute(
-            "SELECT id, device_id, type, message, created_at FROM alerts ORDER BY created_at DESC LIMIT ?",
-            (limit,),
-        ).fetchall()
+        rows = con.execute(query, (limit,)).fetchall()
     return [
-        {"id": r[0], "device_id": r[1], "type": r[2], "message": r[3], "created_at": r[4]}
+        {
+            "id": r[0],
+            "device_id": r[1],
+            "type": r[2],
+            "message": r[3],
+            "created_at": r[4],
+            "resolved": bool(r[5]),
+        }
         for r in rows
     ]
+
+
+def resolve_alert(alert_id: str) -> bool:
+    """Marks an alert resolved. Returns False if no such alert exists."""
+    with get_connection() as con:
+        cursor = con.execute("UPDATE alerts SET resolved = 1 WHERE id = ?", (alert_id,))
+        con.commit()
+        return cursor.rowcount > 0
+
+
+def get_alert(alert_id: str) -> dict[str, Any] | None:
+    with get_connection() as con:
+        row = con.execute(
+            "SELECT id, device_id, type, message, created_at, resolved FROM alerts WHERE id = ?",
+            (alert_id,),
+        ).fetchone()
+    if row is None:
+        return None
+    return {
+        "id": row[0],
+        "device_id": row[1],
+        "type": row[2],
+        "message": row[3],
+        "created_at": row[4],
+        "resolved": bool(row[5]),
+    }
 
 
 def insert_report(lat: float | None, lng: float | None, note: str | None, photo_path: str | None) -> str:

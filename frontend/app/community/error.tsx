@@ -5,7 +5,13 @@ import { AlertTriangle } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 
-export default function CommunityError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
+export default function CommunityError({
+  error,
+  reset,
+}: {
+  error: Error & { digest?: string };
+  reset: () => void;
+}) {
   useEffect(() => {
     console.error(error);
   }, [error]);

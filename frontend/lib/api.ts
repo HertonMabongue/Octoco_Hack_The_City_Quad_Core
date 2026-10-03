@@ -52,6 +52,7 @@ const MOCK_ALERTS: Alert[] = [
     type: "overflow",
     message: "Bin 93% full — needs collection",
     createdAt: new Date().toISOString(),
+    resolved: false,
   },
   {
     id: "a2",
@@ -59,6 +60,7 @@ const MOCK_ALERTS: Alert[] = [
     type: "littering",
     message: "Community report: littering nearby",
     createdAt: new Date().toISOString(),
+    resolved: false,
   },
 ];
 
@@ -97,6 +99,10 @@ export async function getBinHistory(id: string): Promise<BinHistoryPoint[]> {
 export async function getAlerts(): Promise<Alert[]> {
   const data = await safeFetch<Alert[]>("/api/alerts");
   return data ?? MOCK_ALERTS;
+}
+
+export async function resolveAlert(id: string): Promise<Alert | null> {
+  return safeFetch<Alert>(`/api/alerts/${id}/resolve`, { method: "POST" });
 }
 
 export async function submitReport({ lat, lng, note, photo }: ReportInput): Promise<ReportResult> {

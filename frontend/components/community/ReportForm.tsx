@@ -70,7 +70,12 @@ export default function ReportForm() {
       </div>
 
       <div>
-        <Button type="button" variant="outline" onClick={captureLocation} disabled={status === "locating"}>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={captureLocation}
+          disabled={status === "locating"}
+        >
           <MapPin className="h-4 w-4" />
           {coords ? "Location captured" : status === "locating" ? "Locating…" : "Use my location"}
         </Button>
@@ -81,7 +86,9 @@ export default function ReportForm() {
         {status === "submitting" ? "Submitting…" : "Submit report"}
       </Button>
 
-      {status === "error" && <p className="text-sm text-destructive">Something went wrong — try again.</p>}
+      {status === "error" && (
+        <p className="text-sm text-destructive">Something went wrong — try again.</p>
+      )}
     </form>
   );
 }

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import BinMapLoader from "@/components/map/BinMapLoader";
+import MapLegend from "@/components/map/MapLegend";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { STATUS_LABELS } from "@/lib/constants";
@@ -9,7 +10,8 @@ import { getBins } from "@/lib/api";
 
 export const metadata: Metadata = {
   title: "Bins near you",
-  description: "See which bins along the Adam Tas Corridor are filling up, and report a littered area.",
+  description:
+    "See which bins along the Adam Tas Corridor are filling up, and report a littered area.",
 };
 
 export default async function CommunityPage() {
@@ -31,6 +33,9 @@ export default async function CommunityPage() {
 
       <div className="mt-6 h-72 min-w-0 sm:h-96">
         <BinMapLoader bins={bins} />
+      </div>
+      <div className="mt-2">
+        <MapLegend />
       </div>
 
       {bins.length === 0 ? (

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import Footer from "@/components/layout/Footer";
 import Navbar from "@/components/layout/Navbar";
 
 export const metadata: Metadata = {
@@ -11,9 +12,12 @@ export const metadata: Metadata = {
 
 export default function CommunityLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div>
+    <div className="flex min-h-screen flex-col">
       <Navbar />
-      <main className="container py-8">{children}</main>
+      <main id="main-content" className="container flex-1 py-8">
+        {children}
+      </main>
+      <Footer />
     </div>
   );
 }

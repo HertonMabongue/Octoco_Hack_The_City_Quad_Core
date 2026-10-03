@@ -6,7 +6,7 @@ import { ArrowLeft, LayoutDashboard, Recycle } from "lucide-react";
 // truth for the operator-side navigation.
 export default function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
   return (
-    <nav className="flex flex-col">
+    <nav className="flex flex-1 flex-col">
       <Link href="/" onClick={onNavigate} className="mb-8 flex items-center gap-2 font-semibold">
         <Recycle className="h-5 w-5 text-primary" />
         Clean Corridor

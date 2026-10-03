@@ -1,21 +1,37 @@
 /*
   Smart Bin Monitoring — ESP32 + Arduino IDE
 
-  Three independent subsystems, kept deliberately separate:
+  Four independent subsystems, kept deliberately separate:
     1. Ultrasonic sensor  -> bin fill level
     2. PIR sensor         -> estimated people traffic near the bin
     3. Gas sensor         -> hazard warning
+    4. Accelerometer      -> unusual movement / possible theft warning
 
-  All three feed a single OLED display, which shows whichever has the
-  highest priority right now (gas > bin full > medium > not full), plus
-  the traffic reading underneath. A high-traffic reading does NOT mean
-  the bin is full — they are unrelated measurements shown together.
+  All four feed a single OLED display, which shows whichever has the
+  highest priority right now (gas > movement > bin full > medium > not
+  full), plus the traffic reading underneath. A high-traffic reading does
+  NOT mean the bin is full, and a movement alert does NOT mean theft has
+  definitely occurred — they are independent, best-effort measurements
+  shown together.
 */
 
 #include <Arduino.h>
 #include <SPI.h>
+#include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
+
+// Accelerometer: ADXL345 over I2C. (Assumed from the part number given —
+// "ADXL3620346" isn't a real part; the ADXL345 is the standard digital,
+// I2C-capable member of the ADXL family, which is what the SDA/SCL wiring
+// below requires. If a different digital accelerometer is actually
+// fitted, swap this include and the accel.begin()/getEvent() calls in
+// setup()/detectAbnormalMovement() — nothing else in this file needs to
+// change.)
+// Install via Arduino IDE Library Manager: "Adafruit ADXL345" and its
+// dependency "Adafruit Unified Sensor".
+#include <Adafruit_Sensor.h>
+#include <Adafruit_ADXL345_U.h>
 
 // ---------- Pin definitions ----------
 #define TRIG_PIN       5
@@ -30,6 +46,11 @@
 #define OLED_RESET     16
 #define OLED_DC        17
 #define OLED_CS        -1   // not used
+
+// Accelerometer (I2C) — do not use GPIO21/22 for this bus; 22 is already
+// the OLED's SPI clock.
+#define ACCEL_SCL      32
+#define ACCEL_SDA      33
 
 #define SCREEN_WIDTH  128
 #define SCREEN_HEIGHT 64
@@ -48,7 +69,13 @@
 
 #define LED_FLASH_INTERVAL_MS 150UL
 
+// ---------- Accelerometer / movement thresholds (NEW) ----------
+#define MOVEMENT_THRESHOLD_MS2          3.0f  // m/s^2 delta from baseline considered "significant" — prototype value, not a calibrated figure
+#define MOVEMENT_CONSECUTIVE_READINGS      5  // ~1s of sustained movement at this loop's ~200ms pace, so one bump/vibration/noise spike can't trigger an alert
+#define BASELINE_SAMPLE_COUNT             10  // samples averaged at startup to establish the "stationary" baseline
+
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, OLED_MOSI, OLED_SCK, OLED_DC, OLED_RESET, OLED_CS);
+Adafruit_ADXL345_Unified accel = Adafruit_ADXL345_Unified(12345); // NEW — sensor ID is arbitrary, just needs to be unique
 
 // ---------- PIR / traffic state ----------
 bool pirLastState = LOW;        // previous PIR reading, to detect LOW->HIGH transitions
@@ -61,13 +88,21 @@ bool lastTrafficHigh = false;   // classification for the most recently complete
 unsigned long lastLedToggle = 0;
 bool ledState = false;
 
+// ---------- Accelerometer / movement state (NEW) ----------
+bool accelAvailable = false;        // true once the accelerometer is detected in setup()
+float baselineAccelX = 0, baselineAccelY = 0, baselineAccelZ = 0; // "stationary" reference, set once at startup
+float lastAccelX = 0, lastAccelY = 0, lastAccelZ = 0;             // most recent reading, for Serial/display
+int movementExceedStreak = 0;       // consecutive loop iterations the delta has exceeded the threshold
+
 // ---------- Function declarations ----------
 float readUltrasonicDistance();
 int readGasLevel();
 bool isPersonDetected();
 void updateTrafficCount();
-void updateDisplay(float distance, int gasValue, bool gasAlert);
-void handleWarningLED(bool binFull, bool gasAlert);
+void updateDisplay(float distance, int gasValue, bool gasAlert, bool movementAlert);
+void handleWarningLED(bool binFull, bool gasAlert, bool movementAlert);
+void calibrateAccelBaseline();       // NEW
+bool detectAbnormalMovement();       // NEW
 
 void setup() {
   Serial.begin(115200);
@@ -100,20 +135,36 @@ void setup() {
   delay(1000);
 
   trafficWindowStart = millis();
+
+  // ---------------- Accelerometer setup (NEW) ----------------
+  // Independent of the OLED (separate bus: I2C vs SPI), so an issue here
+  // never blocks ultrasonic/PIR/gas/OLED from working — movement
+  // detection just stays disabled if the sensor isn't found.
+  Wire.begin(ACCEL_SDA, ACCEL_SCL);
+  accelAvailable = accel.begin();
+  if (!accelAvailable) {
+    Serial.println(F("Accelerometer not detected - check I2C wiring (movement detection disabled)"));
+  } else {
+    accel.setRange(ADXL345_RANGE_2_G);
+    Serial.println(F("Calibrating accelerometer baseline - keep the bin still..."));
+    calibrateAccelBaseline();
+    Serial.println(F("Accelerometer baseline set."));
+  }
 }
 
 void loop() {
   float distance = readUltrasonicDistance();
   int gasValue = readGasLevel();
   bool gasAlert = (gasValue >= GAS_THRESHOLD);
+  bool movementAlert = detectAbnormalMovement(); // NEW
 
   updateTrafficCount();
 
   bool hasObject = (distance > 0);
   bool binFull = hasObject && (distance <= FULL_DISTANCE);
 
-  handleWarningLED(binFull, gasAlert);
-  updateDisplay(distance, gasValue, gasAlert);
+  handleWarningLED(binFull, gasAlert, movementAlert);
+  updateDisplay(distance, gasValue, gasAlert, movementAlert);
 
   // ---- Serial debug ----
   if (hasObject) {
@@ -128,7 +179,16 @@ void loop() {
   Serial.print(F(" | People: "));
   Serial.print(peopleCount);
   Serial.print(F(" | Traffic: "));
-  Serial.println(lastTrafficHigh ? F("HIGH") : F("NORMAL"));
+  Serial.print(lastTrafficHigh ? F("HIGH") : F("NORMAL"));
+  // NEW — accelerometer fields appended to the existing line, same style
+  Serial.print(F(" | X: "));
+  Serial.print(lastAccelX, 2);
+  Serial.print(F(" | Y: "));
+  Serial.print(lastAccelY, 2);
+  Serial.print(F(" | Z: "));
+  Serial.print(lastAccelZ, 2);
+  Serial.print(F(" | Movement: "));
+  Serial.println(movementAlert ? F("POSSIBLE THEFT") : F("NORMAL"));
 
   delay(200); // paces sensor reads/display updates; short enough not to miss PIR events
 }
@@ -183,10 +243,11 @@ void updateTrafficCount() {
   }
 }
 
-// Non-blocking LED flash while a warning is active (gas or bin full).
-// LED stays off during normal operation.
-void handleWarningLED(bool binFull, bool gasAlert) {
-  bool warningActive = binFull || gasAlert;
+// Non-blocking LED flash while a warning is active (gas, movement, or
+// bin full). LED stays off during normal operation — unchanged from
+// before, just with movementAlert added as another trigger.
+void handleWarningLED(bool binFull, bool gasAlert, bool movementAlert) {
+  bool warningActive = binFull || gasAlert || movementAlert;
 
   if (!warningActive) {
     digitalWrite(LED_PIN, LOW);
@@ -202,11 +263,64 @@ void handleWarningLED(bool binFull, bool gasAlert) {
   }
 }
 
+// ---------------- Accelerometer / movement detection (NEW) ----------------
+
+// Averages BASELINE_SAMPLE_COUNT readings to establish what "stationary"
+// looks like for this bin at startup. Called once from setup(), only if
+// the accelerometer was detected.
+void calibrateAccelBaseline() {
+  float sumX = 0, sumY = 0, sumZ = 0;
+
+  for (int i = 0; i < BASELINE_SAMPLE_COUNT; i++) {
+    sensors_event_t event;
+    accel.getEvent(&event);
+    sumX += event.acceleration.x;
+    sumY += event.acceleration.y;
+    sumZ += event.acceleration.z;
+    delay(50);
+  }
+
+  baselineAccelX = sumX / BASELINE_SAMPLE_COUNT;
+  baselineAccelY = sumY / BASELINE_SAMPLE_COUNT;
+  baselineAccelZ = sumZ / BASELINE_SAMPLE_COUNT;
+}
+
+// Reads the accelerometer and returns true only once the deviation from
+// the stationary baseline has stayed above MOVEMENT_THRESHOLD_MS2 for
+// MOVEMENT_CONSECUTIVE_READINGS in a row. This is deliberately not a
+// single-spike trigger — sensor noise, small bumps, vibration, or someone
+// briefly touching the bin should not read as "possible theft". The
+// accelerometer can only report unusual movement, never confirm theft,
+// which is why both the OLED and Serial wording stay hedged.
+bool detectAbnormalMovement() {
+  if (!accelAvailable) return false;
+
+  sensors_event_t event;
+  accel.getEvent(&event);
+  lastAccelX = event.acceleration.x;
+  lastAccelY = event.acceleration.y;
+  lastAccelZ = event.acceleration.z;
+
+  float deltaX = fabs(lastAccelX - baselineAccelX);
+  float deltaY = fabs(lastAccelY - baselineAccelY);
+  float deltaZ = fabs(lastAccelZ - baselineAccelZ);
+  float deltaMagnitude = sqrt(deltaX * deltaX + deltaY * deltaY + deltaZ * deltaZ);
+
+  if (deltaMagnitude >= MOVEMENT_THRESHOLD_MS2) {
+    movementExceedStreak++;
+  } else {
+    movementExceedStreak = 0;
+  }
+
+  return movementExceedStreak >= MOVEMENT_CONSECUTIVE_READINGS;
+}
+
 // Renders the current status to the OLED, in priority order:
-//   1. Gas alert       2. Bin full       3. Medium capacity
-//   4. Bin not full     5. No object detected (also shown as "not full")
+//   1. Gas alert   2. Possible theft / movement   3. Bin full
+//   4. Medium capacity   5. Bin not full   6. No object detected (also
+//   shown as "not full")
 // Traffic info is always shown underneath — it's a separate measurement.
-void updateDisplay(float distance, int gasValue, bool gasAlert) {
+void updateDisplay(float distance, int gasValue, bool gasAlert, bool movementAlert) {
   bool hasObject = (distance > 0);
 
   display.clearDisplay();
@@ -220,6 +334,15 @@ void updateDisplay(float distance, int gasValue, bool gasAlert) {
     display.setCursor(0, 20);
     display.print(F("Gas Level: "));
     display.println(gasValue);
+  } else if (movementAlert) {
+    // NEW — priority 2, between gas and bin-full per spec.
+    display.setTextSize(2);
+    display.setCursor(0, 0);
+    display.println(F("MOVEMENT"));
+    display.println(F("ALERT!"));
+    display.setTextSize(1);
+    display.setCursor(0, 36);
+    display.println(F("POSSIBLE THEFT"));
   } else if (hasObject && distance <= FULL_DISTANCE) {
     display.setTextSize(2);
     display.setCursor(0, 0);

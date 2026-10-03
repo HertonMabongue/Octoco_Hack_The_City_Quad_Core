@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
 
 import AlertFeed from "@/components/dashboard/AlertFeed";
-import BinStatusCard from "@/components/dashboard/BinStatusCard";
+import AutoRefresh from "@/components/dashboard/AutoRefresh";
+import BinList from "@/components/dashboard/BinList";
 import BinMapLoader from "@/components/map/BinMapLoader";
+import MapLegend from "@/components/map/MapLegend";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getAlerts, getBins } from "@/lib/api";
 
@@ -16,14 +18,24 @@ export default async function DashboardPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-semibold tracking-tight">Corridor overview</h1>
-      <p className="mt-1 text-sm text-muted-foreground">
-        {bins.length} bins monitored · {alerts.length} active alerts
-      </p>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Corridor overview</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {bins.length} bins monitored · {alerts.length} active alerts
+          </p>
+        </div>
+        <AutoRefresh />
+      </div>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[1.4fr_1fr]">
-        <div className="h-72 min-w-0 sm:h-96 lg:h-[420px]">
-          <BinMapLoader bins={bins} />
+        <div>
+          <div className="h-72 min-w-0 sm:h-96 lg:h-[420px]">
+            <BinMapLoader bins={bins} />
+          </div>
+          <div className="mt-2">
+            <MapLegend />
+          </div>
         </div>
 
         <Card>
@@ -37,15 +49,7 @@ export default async function DashboardPage() {
       </div>
 
       <h2 className="mb-3 mt-10 text-base font-semibold">Bins</h2>
-      {bins.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No bins reporting yet.</p>
-      ) : (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {bins.map((bin) => (
-            <BinStatusCard key={bin.id} bin={bin} />
-          ))}
-        </div>
-      )}
+      <BinList bins={bins} />
     </div>
   );
 }

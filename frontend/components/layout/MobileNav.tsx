@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 
 import SidebarNav from "./SidebarNav";
+import ThemeToggle from "./ThemeToggle";
 
 // Top bar + slide-in drawer for the municipal dashboard on small screens,
 // replacing the persistent Sidebar (see Sidebar.tsx) below the lg breakpoint.
@@ -21,17 +22,20 @@ export default function MobileNav() {
         Clean Corridor
       </Link>
 
-      <Sheet open={open} onOpenChange={setOpen}>
-        <SheetTrigger asChild>
-          <Button variant="outline" size="icon" aria-label="Open navigation menu">
-            <Menu className="h-5 w-5" />
-          </Button>
-        </SheetTrigger>
-        <SheetContent side="left">
-          <SheetTitle className="sr-only">Navigation</SheetTitle>
-          <SidebarNav onNavigate={() => setOpen(false)} />
-        </SheetContent>
-      </Sheet>
+      <div className="flex items-center gap-2">
+        <ThemeToggle />
+        <Sheet open={open} onOpenChange={setOpen}>
+          <SheetTrigger asChild>
+            <Button variant="outline" size="icon" aria-label="Open navigation menu">
+              <Menu className="h-5 w-5" />
+            </Button>
+          </SheetTrigger>
+          <SheetContent side="left">
+            <SheetTitle className="sr-only">Navigation</SheetTitle>
+            <SidebarNav onNavigate={() => setOpen(false)} />
+          </SheetContent>
+        </Sheet>
+      </div>
     </div>
   );
 }

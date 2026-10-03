@@ -27,7 +27,7 @@ export default function BinStatusCard({ bin }: { bin: Bin }) {
 
           <div className="h-2 overflow-hidden rounded-full bg-secondary">
             <div
-              className="h-full rounded-full bg-[hsl(var(--status-good))] data-[status=warning]:bg-[hsl(var(--status-warning))] data-[status=critical]:bg-[hsl(var(--status-critical))]"
+              className="h-full rounded-full bg-[hsl(var(--status-good))] data-[status=critical]:bg-[hsl(var(--status-critical))] data-[status=warning]:bg-[hsl(var(--status-warning))]"
               data-status={bin.status}
               style={{ width: `${bin.fillPct}%` }}
             />

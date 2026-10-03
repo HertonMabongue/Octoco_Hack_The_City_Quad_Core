@@ -29,7 +29,8 @@ export default async function BinDetailPage({ params }: BinDetailPageProps) {
         </Badge>
       </div>
       <p className="mt-1 text-sm text-muted-foreground">
-        {bin.fillPct}% full · mode: {bin.mode} · last updated {new Date(bin.lastUpdated).toLocaleString()}
+        {bin.fillPct}% full · mode: {bin.mode} · last updated{" "}
+        {new Date(bin.lastUpdated).toLocaleString()}
       </p>
 
       <h2 className="mb-4 mt-8 text-base font-semibold">Fill level history</h2>

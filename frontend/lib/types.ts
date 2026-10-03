@@ -33,6 +33,7 @@ export interface Alert {
   type: AlertType;
   message: string;
   createdAt: string;
+  resolved: boolean;
 }
 
 export interface ReportInput {
