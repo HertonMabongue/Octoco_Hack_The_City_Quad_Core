@@ -1,7 +1,6 @@
 import type { Config } from "tailwindcss";
 
 const config: Config = {
-  darkMode: ["class"],
   content: ["./app/**/*.{ts,tsx}", "./components/**/*.{ts,tsx}"],
   theme: {
     container: {
@@ -55,6 +54,10 @@ const config: Config = {
           good: "hsl(var(--status-good))",
           warning: "hsl(var(--status-warning))",
           critical: "hsl(var(--status-critical))",
+        },
+        chip: {
+          info: "hsl(var(--chip-info))",
+          violet: "hsl(var(--chip-violet))",
         },
       },
       borderRadius: {

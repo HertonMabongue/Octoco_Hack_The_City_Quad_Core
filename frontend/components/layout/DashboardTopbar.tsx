@@ -15,14 +15,6 @@ export default function DashboardTopbar({ username }: { username: string }) {
       <SectionLabel />
 
       <div className="flex items-center gap-3">
-        <span className="hidden items-center gap-1.5 rounded-sm bg-status-good/10 px-2 py-1 font-mono text-[10px] font-semibold uppercase tracking-wide text-status-good sm:flex">
-          <span className="relative flex h-1.5 w-1.5">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-status-good opacity-75" />
-            <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-status-good" />
-          </span>
-          Live
-        </span>
-
         <AlertBell />
 
         <div className="flex items-center gap-2 border-l border-border pl-3">

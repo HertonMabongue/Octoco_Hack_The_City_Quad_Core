@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { API_URL } from "@/lib/constants";
 import { resolveReport } from "@/lib/api";
+import { cn } from "@/lib/utils";
 import type { ReportRecord } from "@/lib/types";
 
 // The municipal incident log: every community littering report, resolved
@@ -32,28 +33,38 @@ export default function IncidentList({ reports: initial }: { reports: ReportReco
   }
 
   return (
-    <ul className="divide-y divide-border">
+    <div className="divide-y divide-border/70 overflow-hidden rounded-xl border border-border/60 bg-card shadow-card">
       {reports.map((report) => (
-        <li key={report.id} className="flex gap-4 py-4">
-          {report.photoUrl && (
+        <div
+          key={report.id}
+          className={cn(
+            "relative flex gap-4 py-4 pl-6 pr-4 before:absolute before:inset-y-0 before:left-0 before:w-1 before:content-['']",
+            report.resolved ? "before:bg-status-good" : "before:bg-status-warning"
+          )}
+        >
+          {report.photoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={`${API_URL}${report.photoUrl}`}
               alt="Reported littered area"
-              className="h-16 w-16 shrink-0 rounded-md border border-border object-cover"
+              className="h-20 w-20 shrink-0 rounded-md border border-border object-cover"
             />
+          ) : (
+            <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-md bg-secondary text-muted-foreground">
+              <MapPin className="h-5 w-5" />
+            </div>
           )}
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-sm">{report.note || "Community report: littered area"}</p>
+              <p className="text-sm font-medium">{report.note || "Community report: littered area"}</p>
               <Badge variant={report.resolved ? "good" : "warning"} dot>
                 {report.resolved ? "Resolved" : "Open"}
               </Badge>
             </div>
-            <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+            <div className="mt-1.5 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
               <span>{new Date(report.createdAt).toLocaleString()}</span>
               {report.lat != null && report.lng != null && (
-                <span className="inline-flex items-center gap-1">
+                <span className="inline-flex items-center gap-1 font-mono">
                   <MapPin className="h-3 w-3" />
                   {report.lat.toFixed(4)}, {report.lng.toFixed(4)}
                 </span>
@@ -76,8 +87,8 @@ export default function IncidentList({ reports: initial }: { reports: ReportReco
               Resolve
             </Button>
           )}
-        </li>
+        </div>
       ))}
-    </ul>
+    </div>
   );
 }

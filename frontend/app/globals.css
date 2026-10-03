@@ -40,89 +40,18 @@
     --status-warning: 32 92% 46%;
     --status-critical: 2 72% 48%;
 
+    /* Purely decorative chip hues for stat tiles that aren't reporting a
+       state (bins monitored, average fill) — kept visually distinct from
+       --status-* so colour is never ambiguous between "this is a reading"
+       and "this needs attention". */
+    --chip-info: 206 72% 42%;
+    --chip-violet: 262 48% 48%;
+
     --radius: 0.625rem;
 
     --shadow-color: 30 25% 12%;
     --shadow-card: 0 1px 2px hsl(var(--shadow-color) / 0.04), 0 10px 24px -12px hsl(var(--shadow-color) / 0.16);
     --shadow-card-hover: 0 2px 4px hsl(var(--shadow-color) / 0.06), 0 16px 32px -14px hsl(var(--shadow-color) / 0.22);
-  }
-
-  :root[data-theme="dark"] {
-    --background: 20 16% 7%;
-    --foreground: 40 10% 96%;
-
-    --card: 20 15% 10%;
-    --card-foreground: 40 10% 96%;
-
-    --popover: 20 15% 10%;
-    --popover-foreground: 40 10% 96%;
-
-    --primary: 142 55% 48%;
-    --primary-foreground: 20 20% 8%;
-
-    --secondary: 20 10% 15%;
-    --secondary-foreground: 40 10% 96%;
-
-    --muted: 20 10% 15%;
-    --muted-foreground: 30 8% 63%;
-
-    --accent: 142 20% 16%;
-    --accent-foreground: 142 45% 75%;
-
-    --destructive: 0 63% 42%;
-    --destructive-foreground: 40 10% 96%;
-
-    --border: 20 10% 19%;
-    --input: 20 10% 19%;
-    --ring: 142 55% 48%;
-
-    --status-good: 142 55% 46%;
-    --status-warning: 36 90% 58%;
-    --status-critical: 4 78% 62%;
-
-    --shadow-color: 0 0% 0%;
-    --shadow-card: 0 1px 2px hsl(var(--shadow-color) / 0.3), 0 10px 28px -10px hsl(var(--shadow-color) / 0.55);
-    --shadow-card-hover: 0 2px 4px hsl(var(--shadow-color) / 0.35), 0 18px 36px -12px hsl(var(--shadow-color) / 0.6);
-  }
-
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) {
-      --background: 20 16% 7%;
-      --foreground: 40 10% 96%;
-
-      --card: 20 15% 10%;
-      --card-foreground: 40 10% 96%;
-
-      --popover: 20 15% 10%;
-      --popover-foreground: 40 10% 96%;
-
-      --primary: 142 55% 48%;
-      --primary-foreground: 20 20% 8%;
-
-      --secondary: 20 10% 15%;
-      --secondary-foreground: 40 10% 96%;
-
-      --muted: 20 10% 15%;
-      --muted-foreground: 30 8% 63%;
-
-      --accent: 142 20% 16%;
-      --accent-foreground: 142 45% 75%;
-
-      --destructive: 0 63% 42%;
-      --destructive-foreground: 40 10% 96%;
-
-      --border: 20 10% 19%;
-      --input: 20 10% 19%;
-      --ring: 142 55% 48%;
-
-      --status-good: 142 55% 46%;
-      --status-warning: 36 90% 58%;
-      --status-critical: 4 78% 62%;
-
-      --shadow-color: 0 0% 0%;
-      --shadow-card: 0 1px 2px hsl(var(--shadow-color) / 0.3), 0 10px 28px -10px hsl(var(--shadow-color) / 0.55);
-      --shadow-card-hover: 0 2px 4px hsl(var(--shadow-color) / 0.35), 0 18px 36px -12px hsl(var(--shadow-color) / 0.6);
-    }
   }
 }
 
@@ -139,9 +68,8 @@
 @layer utilities {
   /* A faint dot grid for surfaces that want a "control panel" texture
      without a stock illustration or gradient blob — used on the two
-     surfaces that are a fixed dark panel regardless of light/dark theme
-     (the homepage device readout, the login screen), so the dots are a
-     flat white value rather than the theme-following --foreground. */
+     fixed dark panels (the homepage device readout, the login screen),
+     so the dots are a flat white value regardless of surface color. */
   .bg-grid-dots {
     background-image: radial-gradient(rgb(255 255 255 / 0.07) 1px, transparent 1px);
     background-size: 16px 16px;
