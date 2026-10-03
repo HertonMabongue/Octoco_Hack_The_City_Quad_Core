@@ -3,8 +3,6 @@ import { Recycle } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 
-import ThemeToggle from "./ThemeToggle";
-
 // Top nav for the public/community side.
 export default function Navbar() {
   return (
@@ -17,7 +15,6 @@ export default function Navbar() {
           Clean Corridor
         </Link>
         <div className="flex items-center gap-2">
-          <ThemeToggle />
           <Button asChild size="sm">
             <Link href="/community/report">Report littering</Link>
           </Button>

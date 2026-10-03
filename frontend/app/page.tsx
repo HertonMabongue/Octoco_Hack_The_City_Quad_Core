@@ -1,8 +1,11 @@
+import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, Flame, Footprints, Vibrate, Waves } from "lucide-react";
 
 import Footer from "@/components/layout/Footer";
 import { Button } from "@/components/ui/button";
+
+import heroImage from "../public/images/corridor-hero.jpg";
 
 // Each bin carries four independent sensors (see
 // firmware/src/OctocoEsp32Project.ino) — this is the real threshold logic
@@ -40,86 +43,104 @@ const SENSORS = [
   },
 ];
 
-// Deliberately two sections and nothing else: a hero that states the
-// idea once, and the spec sheet that backs it up. No repeated CTA cards,
-// no logo strip, no feature-grid filler — the dashboard and community
-// app links live in the hero and the footer, not three more times in
-// between.
+// Deliberately two sections and nothing else: a full-bleed photo hero
+// that states the idea once, and the spec sheet that backs it up. No
+// repeated CTA cards, no logo strip, no feature-grid filler.
 export default function HomePage() {
   return (
     <>
       <main id="main-content">
-        <section>
-          <div className="container grid gap-12 py-20 lg:grid-cols-[1.1fr_0.9fr] lg:items-center lg:py-28">
-            <div className="flex flex-col gap-6">
-              <span className="text-sm font-medium uppercase tracking-widest text-primary">
-                Adam Tas Corridor, Stellenbosch
+        <section className="relative flex min-h-[92vh] items-center overflow-hidden">
+          <Image
+            src={heroImage}
+            alt="Smart Waste Management"
+            fill
+            priority
+            placeholder="blur"
+            sizes="100vw"
+            className="object-cover"
+          />
+          {/* Darkens left-to-right and bottom-to-top so white text sits on
+              a readable patch of sky rather than the whole photo being
+              washed out — the image itself stays recognisable. */}
+          <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/50 to-black/20" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-black/10" />
+
+          <div className="container relative flex flex-col gap-6 py-24 text-white">
+            <span className="text-sm font-medium uppercase tracking-widest text-white/80">
+              Adam Tas Corridor, Stellenbosch
+            </span>
+
+            <h1 className="font-display max-w-xl text-4xl font-semibold tracking-tight sm:text-5xl">
+              Four sensors. One signal before overflow.
+            </h1>
+
+            <p className="max-w-lg text-lg text-white/85">
+              Smart bins that detect fill, air quality, foot traffic, and tampering, with collection
+              alerts for the city and a simple way for residents to report waste.
+            </p>
+
+            <div className="flex flex-wrap items-center gap-3 pt-2">
+              <Button asChild size="lg" className="bg-white text-black shadow-lg hover:bg-white/90">
+                <Link href="/dashboard">
+                  Municipal dashboard
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
+              </Button>
+              <Button
+                asChild
+                size="lg"
+                variant="outline"
+                className="border-white/40 bg-white/10 text-white backdrop-blur hover:bg-white/20 hover:text-white"
+              >
+                <Link href="/community">Community app</Link>
+              </Button>
+            </div>
+          </div>
+
+          {/* A device-readout mockup, styled after the bin's own OLED
+              status screen, instead of a stock illustration — this is
+              what the dashboard is actually built from. Floated over the
+              photo rather than boxed beside it, so the hero stays one
+              clean image with one job. */}
+          <div className="absolute bottom-8 right-8 hidden w-72 rounded-xl border border-white/10 bg-[#0d120f]/90 p-4 font-mono text-[#d7f5df] shadow-2xl backdrop-blur sm:block">
+            <div className="flex items-center justify-between border-b border-white/10 pb-2.5 text-xs text-[#9fd6ad]">
+              <span>BIN-03 · Bergkelder corner</span>
+              <span className="flex items-center gap-1.5">
+                <span className="h-1.5 w-1.5 rounded-full bg-[#ff5c5c]" />
+                emergency
               </span>
-
-              <h1 className="max-w-xl font-display text-4xl font-semibold tracking-tight sm:text-5xl">
-                Four sensors. One signal before overflow.
-              </h1>
-
-              <p className="max-w-lg text-lg text-muted-foreground">
-                Smart bins that detect fill, air quality, foot traffic, and tampering, with
-                collection alerts for the city and a simple way for residents to report waste.
-              </p>
-
-              <div className="flex flex-wrap items-center gap-3 pt-2">
-                <Button asChild size="lg">
-                  <Link href="/dashboard">
-                    Municipal dashboard
-                    <ArrowRight className="h-4 w-4" />
-                  </Link>
-                </Button>
-                <Button asChild size="lg" variant="outline">
-                  <Link href="/community">Community app</Link>
-                </Button>
-              </div>
             </div>
-
-            {/* A device-readout mockup, styled after the bin's own OLED
-                status screen, instead of a stock illustration — this is
-                what the dashboard is actually built from. */}
-            <div className="bg-grid-dots rounded-xl border border-black/40 bg-[#0d120f] p-5 font-mono text-[#d7f5df] shadow-2xl">
-              <div className="flex items-center justify-between border-b border-white/10 pb-3 text-xs text-[#9fd6ad]">
-                <span>BIN-03 · Bergkelder corner</span>
-                <span className="flex items-center gap-1.5">
-                  <span className="h-1.5 w-1.5 rounded-full bg-[#ff5c5c]" />
-                  emergency mode
-                </span>
+            <dl className="mt-2.5 flex flex-col gap-2 text-xs">
+              <div className="flex items-center justify-between">
+                <dt className="flex items-center gap-1.5 text-[#9fd6ad]">
+                  <Waves className="h-3 w-3" /> fill
+                </dt>
+                <dd>93%</dd>
               </div>
-              <dl className="mt-3 flex flex-col gap-2.5 text-sm">
-                <div className="flex items-center justify-between">
-                  <dt className="flex items-center gap-2 text-[#9fd6ad]">
-                    <Waves className="h-3.5 w-3.5" /> fill
-                  </dt>
-                  <dd>93%</dd>
-                </div>
-                <div className="flex items-center justify-between">
-                  <dt className="flex items-center gap-2 text-[#ff8b6a]">
-                    <Flame className="h-3.5 w-3.5" /> gas (raw)
-                  </dt>
-                  <dd className="text-[#ff8b6a]">890 (hazard)</dd>
-                </div>
-                <div className="flex items-center justify-between">
-                  <dt className="flex items-center gap-2 text-[#9fd6ad]">
-                    <Footprints className="h-3.5 w-3.5" /> traffic (10s)
-                  </dt>
-                  <dd>1</dd>
-                </div>
-                <div className="flex items-center justify-between">
-                  <dt className="flex items-center gap-2 text-[#ff8b6a]">
-                    <Vibrate className="h-3.5 w-3.5" /> movement
-                  </dt>
-                  <dd className="text-[#ff8b6a]">alert</dd>
-                </div>
-              </dl>
-            </div>
+              <div className="flex items-center justify-between">
+                <dt className="flex items-center gap-1.5 text-[#ff8b6a]">
+                  <Flame className="h-3 w-3" /> gas (raw)
+                </dt>
+                <dd className="text-[#ff8b6a]">890 (hazard)</dd>
+              </div>
+              <div className="flex items-center justify-between">
+                <dt className="flex items-center gap-1.5 text-[#9fd6ad]">
+                  <Footprints className="h-3 w-3" /> traffic (10s)
+                </dt>
+                <dd>1</dd>
+              </div>
+              <div className="flex items-center justify-between">
+                <dt className="flex items-center gap-1.5 text-[#ff8b6a]">
+                  <Vibrate className="h-3 w-3" /> movement
+                </dt>
+                <dd className="text-[#ff8b6a]">alert</dd>
+              </div>
+            </dl>
           </div>
         </section>
 
-        <section className="container pb-24">
+        <section className="container py-16">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
             What&apos;s on each bin
           </h2>
