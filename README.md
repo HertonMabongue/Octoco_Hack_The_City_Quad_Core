@@ -154,7 +154,23 @@ npm run dev        # or: lint / typecheck / build / format
 
 ## Forecasting (ML — not built yet)
 
-`backend/app/forecasting/` is reserved for a regression model that
-predicts a bin's time-to-full from its fill-history (`app.db.history()`),
-so collection can be scheduled before a bin overflows instead of after.
-Not started — see `backend/app/forecasting/README.md` before picking it up.
+`backend/app/forecasting/` is reserved for the predictive layer: models that
+use the bin's sensor readings to act before a problem happens instead of
+after. Every bin already stores four independent signals in the `readings`
+table, so there is more than one thing worth predicting:
+
+| Signal (column) | Sensor | Possible model |
+| --- | --- | --- |
+| `fill_pct`, `distance_cm` | Ultrasonic | Regression on fill history → **time-to-full**, so collection is scheduled before overflow |
+| `people_count` | PIR | Foot-traffic profile by hour/day → adjusts the fill rate (a busy bin fills faster) and improves the time-to-full estimate |
+| `gas_raw` | Gas | Trend / anomaly detection → early **hazard** warning, before `GAS_ALERT_RAW` is crossed |
+| `movement_alert` | Accelerometer | Anomaly detection on tamper/knock events → separates a bin being emptied or moved from possible theft |
+
+Time-to-full is the headline model; the others are extensions, and they can
+also feed it as extra features. Which of these gets built is up to whoever
+picks this up. Not started — see `backend/app/forecasting/README.md` before
+you begin.
+
+> **Heads up:** `app.db.history()` currently returns only `ts` and
+> `fill_pct`. Anything that uses the other sensors needs that query widened
+> (or a new function next to it) to return the extra columns.

@@ -82,7 +82,8 @@ export default function BinMap({ bins, onSelectBin }: BinMapProps) {
     const map = mapRef.current;
     if (!map) return;
 
-    function syncMarkers() {
+    // Arrow function (not a declaration) so the `map` null-check above stays narrowed.
+    const syncMarkers = () => {
       markersRef.current.forEach((marker) => marker.remove());
       markersRef.current = bins.map((bin) => {
         const popup = new maplibregl.Popup({ offset: 12, closeButton: false }).setHTML(
@@ -100,7 +101,7 @@ export default function BinMap({ bins, onSelectBin }: BinMapProps) {
 
         return marker;
       });
-    }
+    };
 
     if (map.isStyleLoaded()) {
       syncMarkers();

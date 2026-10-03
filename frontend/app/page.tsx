@@ -118,7 +118,7 @@ export default function HomePage() {
 
         <section className="container py-16">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-            What's on each bin
+            What&apos;s on each bin
           </h2>
           <div className="mt-4 divide-y divide-border rounded-lg border border-border">
             {SENSORS.map((sensor) => (

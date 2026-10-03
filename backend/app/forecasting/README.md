@@ -19,10 +19,15 @@ Historical readings are already persisted — no new data pipeline needed,
 just read what's there:
 
 - `app.db.history(device_id, limit)` → chronological
-  `[{"ts": <iso str>, "fill_pct": <float>}, ...]` for one bin. This is the
-  training/inference input.
+  `[{"ts": <iso str>, "fill_pct": <float>}, ...]` for one bin. Fill only —
+  widen it (or add a sibling) to return the other sensor columns.
 - `app.db.latest_reading_by_device()` → latest reading per bin, if the
   model needs current state across all bins at once.
+
+Each reading stores four signals: `fill_pct`/`distance_cm` (ultrasonic),
+`people_count` (PIR), `gas_raw` (gas), `movement_alert` (accelerometer).
+Time-to-full is the main model; the rest can be features or their own
+models (hazard trend, tamper anomaly).
 
 Both are plain functions in `app/db.py` — import and call them directly,
 no need to go through the REST API internally.
