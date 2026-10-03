@@ -4,44 +4,60 @@ import { ArrowRight, Flame, Footprints, Vibrate, Waves } from "lucide-react";
 
 import Footer from "@/components/layout/Footer";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 import heroImage from "../public/images/corridor-hero.jpg";
 
 // Each bin carries four independent sensors (see
 // firmware/src/OctocoEsp32Project.ino) — this is the real threshold logic
-// that runs on the device, not marketing copy. Shown as a spec sheet rather
-// than an icon grid so the homepage says something specific instead of
-// something generic.
+// that runs on the device, not marketing copy. One full-screen panel per
+// sensor rather than an icon grid, so the homepage says something specific
+// instead of something generic.
+// `image` is a plain public-folder path, not a static import: these files
+// don't exist yet. Drop a photo at each path below into public/images and
+// it appears with no code change; until then the panel falls back to a
+// plain dark background.
 const SENSORS = [
   {
-    icon: Waves,
     name: "Ultrasonic",
     part: "HC-SR04",
     measures: "Distance from the lid to the waste surface",
     trigger: "Full once waste sits within 3cm of the sensor",
+    image: "/images/sensor-ultrasonic.jpg",
   },
   {
-    icon: Flame,
     name: "Gas",
     part: "MQ-series",
     measures: "Raw air-quality reading inside the bin",
     trigger: "Hazard flagged above a raw reading of 800",
+    image: "/images/sensor-gas.jpg",
   },
   {
-    icon: Footprints,
     name: "Human Presence",
     part: "PIR",
     measures: "Foot traffic passing the bin",
     trigger: "High traffic at 5+ detections in a 10s window",
+    image: "/images/sensor-presence.jpg",
   },
   {
-    icon: Vibrate,
     name: "Accelerometer",
     part: "ADXL345",
     measures: "Movement against a calibrated baseline",
     trigger: "Tamper flagged on 5 consecutive readings over 3 m/s²",
+    image: "/images/sensor-accelerometer.jpg",
   },
 ];
+
+// Overlay darkness and text side alternate per panel so the sequence has
+// some rhythm once the real photos are in, independent of what each photo
+// actually looks like.
+const SENSOR_VARIANTS: { overlay: string; align: string }[] = [
+  { overlay: "bg-black/65", align: "items-start text-left" },
+  { overlay: "bg-black/75", align: "items-end text-right" },
+  { overlay: "bg-black/70", align: "items-start text-left" },
+  { overlay: "bg-black/80", align: "items-end text-right" },
+];
+const DEFAULT_VARIANT = SENSOR_VARIANTS[0]!;
 
 // Deliberately two sections and nothing else: a full-bleed photo hero
 // that states the idea once, and the spec sheet that backs it up. No
@@ -50,10 +66,10 @@ export default function HomePage() {
   return (
     <>
       <main id="main-content">
-        <section className="relative flex min-h-[92vh] items-center overflow-hidden">
+        <section className="relative flex min-h-screen items-center overflow-hidden">
           <Image
             src={heroImage}
-            alt="Smart Waste Management"
+            alt="The Adam Tas Corridor, Stellenbosch"
             fill
             priority
             placeholder="blur"
@@ -63,16 +79,12 @@ export default function HomePage() {
           {/* Darkens left-to-right and bottom-to-top so white text sits on
               a readable patch of sky rather than the whole photo being
               washed out — the image itself stays recognisable. */}
-          <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/50 to-black/20" />
+          <div className="absolute inset-0 bg-gradient-to-r from-black/75 via-black/40 to-black/10" />
           <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-black/10" />
 
           <div className="container relative flex flex-col gap-6 py-24 text-white">
-            <span className="text-sm font-medium uppercase tracking-widest text-white/80">
-              Adam Tas Corridor, Stellenbosch
-            </span>
-
             <h1 className="font-display max-w-xl text-4xl font-semibold tracking-tight sm:text-5xl">
-              Four sensors. One signal before overflow.
+              Four sensors. None Wasted.
             </h1>
 
             <p className="max-w-lg text-lg text-white/85">
@@ -140,31 +152,31 @@ export default function HomePage() {
           </div>
         </section>
 
-        <section className="container py-16">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-            What&apos;s on each bin
-          </h2>
-          <div className="mt-4 divide-y divide-border/70 overflow-hidden rounded-xl border border-border/60 bg-card shadow-card">
-            {SENSORS.map((sensor) => (
+        {SENSORS.map((sensor, i) => {
+          const variant = SENSOR_VARIANTS[i % SENSOR_VARIANTS.length] ?? DEFAULT_VARIANT;
+          return (
+            <section
+              key={sensor.name}
+              className="relative flex min-h-screen items-center overflow-hidden bg-neutral-900"
+            >
+              <Image src={sensor.image} alt="" fill sizes="100vw" className="object-cover" />
+              <div className={cn("absolute inset-0", variant.overlay)} />
+
               <div
-                key={sensor.name}
-                className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:gap-6"
+                className={cn("container relative flex flex-col gap-3 text-white", variant.align)}
               >
-                <div className="flex items-center gap-3 sm:w-48 sm:shrink-0">
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-accent text-accent-foreground">
-                    <sensor.icon className="h-4 w-4" />
-                  </span>
-                  <div>
-                    <div className="font-medium leading-tight">{sensor.name}</div>
-                    <div className="font-mono text-xs text-muted-foreground">{sensor.part}</div>
-                  </div>
-                </div>
-                <div className="text-sm text-muted-foreground sm:flex-1">{sensor.measures}</div>
-                <div className="text-sm sm:flex-1">{sensor.trigger}</div>
+                <span className="font-mono text-xs uppercase tracking-widest text-white/60">
+                  {sensor.part}
+                </span>
+                <h2 className="font-display max-w-md text-4xl font-semibold tracking-tight sm:text-5xl">
+                  {sensor.name}
+                </h2>
+                <p className="max-w-sm text-lg text-white/80">{sensor.measures}</p>
+                <p className="max-w-sm text-sm text-white/60">{sensor.trigger}</p>
               </div>
-            ))}
-          </div>
-        </section>
+            </section>
+          );
+        })}
       </main>
       <Footer />
     </>

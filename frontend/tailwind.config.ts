@@ -55,6 +55,10 @@ const config: Config = {
           warning: "hsl(var(--status-warning))",
           critical: "hsl(var(--status-critical))",
         },
+        chip: {
+          info: "hsl(var(--chip-info))",
+          violet: "hsl(var(--chip-violet))",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",

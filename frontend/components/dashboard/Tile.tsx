@@ -7,7 +7,11 @@ export interface TileProps {
   value: string;
   sub?: string;
   icon?: LucideIcon;
-  tone?: "default" | "good" | "warning" | "critical";
+  // "info" and "violet" are purely decorative — they give a row of
+  // tiles some visual variety when none of them are actually reporting
+  // a problem. "good" / "warning" / "critical" stay reserved for real
+  // state, so colour never gets ambiguous between the two jobs.
+  tone?: "default" | "good" | "warning" | "critical" | "info" | "violet";
 }
 
 const TONE_ICON_CLASS: Record<NonNullable<TileProps["tone"]>, string> = {
@@ -15,6 +19,8 @@ const TONE_ICON_CLASS: Record<NonNullable<TileProps["tone"]>, string> = {
   good: "bg-status-good/10 text-status-good",
   warning: "bg-status-warning/10 text-status-warning",
   critical: "bg-status-critical/10 text-status-critical",
+  info: "bg-chip-info/10 text-chip-info",
+  violet: "bg-chip-violet/10 text-chip-violet",
 };
 
 // The one stat-card shape used everywhere a single number needs a card:

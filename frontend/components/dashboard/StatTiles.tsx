@@ -20,12 +20,14 @@ export default function StatTiles({ bins, alerts }: { bins: Bin[]; alerts: Alert
       label: "Bins monitored",
       value: String(bins.length),
       icon: PackageCheck,
+      tone: "info",
       sub: offline ? `${offline} offline` : "all reporting",
     },
     {
       label: "Average fill",
       value: `${avgFill}%`,
       icon: Gauge,
+      tone: "violet",
       sub: `collection threshold ${FILL_THRESHOLDS.critical}%`,
     },
     {

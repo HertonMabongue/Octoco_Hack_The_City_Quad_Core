@@ -40,6 +40,13 @@
     --status-warning: 32 92% 46%;
     --status-critical: 2 72% 48%;
 
+    /* Purely decorative chip hues for stat tiles that aren't reporting a
+       state (bins monitored, average fill) — kept visually distinct from
+       --status-* so colour is never ambiguous between "this is a reading"
+       and "this needs attention". */
+    --chip-info: 206 72% 42%;
+    --chip-violet: 262 48% 48%;
+
     --radius: 0.625rem;
 
     --shadow-color: 30 25% 12%;
