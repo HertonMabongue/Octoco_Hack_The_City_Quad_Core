@@ -1,0 +1,51 @@
+:root {
+  color-scheme: dark;
+  font-family: Arial, sans-serif;
+}
+
+body {
+  margin: 0;
+  background: #121417;
+  color: #e8ecf1;
+}
+
+.container {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 1.25rem;
+}
+
+.grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+}
+
+.card {
+  background: #1e232a;
+  border: 1px solid #323b47;
+  border-radius: 10px;
+  padding: 0.75rem;
+}
+
+.card ul {
+  list-style: none;
+  margin: 0.6rem 0;
+  padding: 0;
+}
+
+.alerts {
+  background: #1e232a;
+  border: 1px solid #323b47;
+  border-radius: 10px;
+  padding: 0.75rem 1rem;
+}
+
+.muted {
+  color: #95a0b0;
+}
+
+.trends {
+  display: grid;
+  gap: 0.5rem;
+}
