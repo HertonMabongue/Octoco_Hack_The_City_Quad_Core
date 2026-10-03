@@ -65,12 +65,29 @@ main backend's `/api/forecast` plus the model's extras:
 | `riskLevel` | Same bands as the main backend |
 | `fillPerVisitPct` | Percent of the bin gained per counted visit |
 | `visitsPerHour` | Recent footfall at this bin |
+| `predictedFullAt` | Clock time of the median forecast |
+| `earliestFullAt` | Clock time of the low end of the range. Schedule collection by this time |
+| `collectSoon` | True when `earliestFullAt` is within the lead time, or the bin is already at the threshold |
+| `lastReadingAt` | Timestamp of the reading the forecast runs from |
+
+### The lead time
+
+`collectSoon` looks ahead by a lead time, 2 hours by default. Change it
+per request with `GET /forecast?leadHours=0.1`, or for the whole service
+with the `ML_COLLECT_LEAD_HOURS` environment variable. The mock bins fill
+in minutes, so use a lead time of a few minutes when demoing on mock
+data.
+
+The clock times are the latest reading's timestamp plus the forecast
+hours, in the same timezone as the stored readings (UTC). Convert to
+local time when displaying them.
 
 ## Showing it on the dashboard
 
 Two options, both for whoever owns those files to decide:
 
-- Point the frontend's forecast fetch at `http://<host>:8001/forecast`.
+- Point the frontend's forecast fetch at `http://<host>:8001/forecast`,
+  and show a "collect soon" badge where `collectSoon` is true.
 - Or call the model from the main backend, in
   `backend/app/routers/forecast.py`:
 
