@@ -1,20 +1,22 @@
 "use client";
 
-import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
+import { MapContainer, Marker, Popup, TileLayer } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { STATUS_COLORS } from "../../lib/constants";
+
+import { DEFAULT_MAP_CENTER, STATUS_COLORS } from "@/lib/constants";
+import type { Bin, BinStatus } from "@/lib/types";
 
 // Requires: npm install leaflet react-leaflet
-// Must be loaded with `ssr: false` (see app/dashboard/page.js and
-// app/community/page.js) — Leaflet touches `window`, which doesn't
+// Must be loaded with `ssr: false` (see app/dashboard/page.tsx and
+// app/community/page.tsx) — Leaflet touches `window`, which doesn't
 // exist during server rendering.
 
 // Coloured dot markers instead of the default Leaflet pin — this avoids
 // a well-known Next.js/webpack issue where the default marker icon
 // images fail to resolve, and it encodes bin status for free.
-function statusIcon(status) {
-  const color = STATUS_COLORS[status] ?? "#898781";
+function statusIcon(status: BinStatus) {
+  const color = STATUS_COLORS[status];
   return L.divIcon({
     className: "",
     html: `<div style="width:16px;height:16px;border-radius:50%;background:${color};border:2px solid white;box-shadow:0 0 0 1px rgba(0,0,0,0.2);"></div>`,
@@ -23,19 +25,21 @@ function statusIcon(status) {
   });
 }
 
-// Default centre: roughly the Adam Tas Corridor, Stellenbosch.
-const DEFAULT_CENTER = [-33.9346, 18.8653];
+export interface BinMapProps {
+  bins: Bin[];
+  onSelectBin?: (bin: Bin) => void;
+}
 
-export default function BinMap({ bins, onSelectBin }) {
+export default function BinMap({ bins, onSelectBin }: BinMapProps) {
   return (
     <MapContainer
-      center={DEFAULT_CENTER}
+      center={DEFAULT_MAP_CENTER}
       zoom={15}
-      style={{ height: "100%", width: "100%", minHeight: 320, borderRadius: 12 }}
+      className="h-full min-h-80 w-full rounded-lg"
     >
       <TileLayer
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        attribution='&copy; OpenStreetMap contributors'
+        attribution="&copy; OpenStreetMap contributors"
       />
       {bins.map((bin) => (
         <Marker

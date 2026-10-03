@@ -227,7 +227,10 @@ __marimo__/
 node_modules/
 .next/
 out/
+next-env.d.ts
+*.tsbuildinfo
 
 # Backend local runtime artifacts
 backend/*.sqlite3
 backend/*.db
+backend/uploads/

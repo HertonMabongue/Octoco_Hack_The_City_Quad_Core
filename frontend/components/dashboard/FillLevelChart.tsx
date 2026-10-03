@@ -1,21 +1,22 @@
 "use client";
 
-import { Line } from "react-chartjs-2";
 import {
-  Chart as ChartJS,
   CategoryScale,
+  Chart as ChartJS,
   LinearScale,
-  PointElement,
   LineElement,
+  PointElement,
   Tooltip,
 } from "chart.js";
+import { Line } from "react-chartjs-2";
+
+import type { BinHistoryPoint } from "@/lib/types";
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip);
 
 // Fill-level history for one bin. Single series, so no legend needed —
 // the chart title/heading next to this component names it.
-// Requires: npm install chart.js react-chartjs-2
-export default function FillLevelChart({ history }) {
+export default function FillLevelChart({ history }: { history: BinHistoryPoint[] }) {
   const data = {
     labels: history.map((point) =>
       new Date(point.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })

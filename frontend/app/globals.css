@@ -1,41 +1,121 @@
-/* Minimal base styles. If create-next-app already generated a
-   globals.css with its own reset, merge the two rather than blindly
-   overwriting — keep one copy of `box-sizing` etc. */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-:root {
-  --ink-primary: #0b0b0b;
-  --ink-secondary: #52514e;
-  --ink-muted: #898781;
-  --border: #e1e0d9;
-  --surface: #fcfcfb;
+@layer base {
+  :root {
+    --background: 40 20% 99%;
+    --foreground: 20 14% 4%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 20 14% 4%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 20 14% 4%;
+
+    --primary: 142 71% 29%;
+    --primary-foreground: 0 0% 98%;
+
+    --secondary: 40 14% 94%;
+    --secondary-foreground: 20 14% 10%;
+
+    --muted: 40 14% 94%;
+    --muted-foreground: 25 8% 45%;
+
+    --accent: 40 14% 94%;
+    --accent-foreground: 20 14% 10%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 30 10% 88%;
+    --input: 30 10% 88%;
+    --ring: 142 71% 29%;
+
+    --status-good: 142 71% 35%;
+    --status-warning: 38 92% 50%;
+    --status-critical: 0 72% 51%;
+
+    --radius: 0.75rem;
+  }
+
+  :root[data-theme="dark"] {
+    --background: 20 14% 6%;
+    --foreground: 40 10% 96%;
+
+    --card: 20 14% 8%;
+    --card-foreground: 40 10% 96%;
+
+    --popover: 20 14% 8%;
+    --popover-foreground: 40 10% 96%;
+
+    --primary: 142 60% 45%;
+    --primary-foreground: 20 14% 6%;
+
+    --secondary: 20 10% 14%;
+    --secondary-foreground: 40 10% 96%;
+
+    --muted: 20 10% 14%;
+    --muted-foreground: 30 8% 65%;
+
+    --accent: 20 10% 16%;
+    --accent-foreground: 40 10% 96%;
+
+    --destructive: 0 63% 40%;
+    --destructive-foreground: 40 10% 96%;
+
+    --border: 20 10% 18%;
+    --input: 20 10% 18%;
+    --ring: 142 60% 45%;
+
+    --status-good: 142 60% 45%;
+    --status-warning: 38 92% 55%;
+    --status-critical: 0 72% 58%;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --background: 20 14% 6%;
+      --foreground: 40 10% 96%;
+
+      --card: 20 14% 8%;
+      --card-foreground: 40 10% 96%;
+
+      --popover: 20 14% 8%;
+      --popover-foreground: 40 10% 96%;
+
+      --primary: 142 60% 45%;
+      --primary-foreground: 20 14% 6%;
+
+      --secondary: 20 10% 14%;
+      --secondary-foreground: 40 10% 96%;
+
+      --muted: 20 10% 14%;
+      --muted-foreground: 30 8% 65%;
+
+      --accent: 20 10% 16%;
+      --accent-foreground: 40 10% 96%;
+
+      --destructive: 0 63% 40%;
+      --destructive-foreground: 40 10% 96%;
+
+      --border: 20 10% 18%;
+      --input: 20 10% 18%;
+      --ring: 142 60% 45%;
+
+      --status-good: 142 60% 45%;
+      --status-warning: 38 92% 55%;
+      --status-critical: 0 72% 58%;
+    }
+  }
 }
 
-* {
-  box-sizing: border-box;
-}
+@layer base {
+  * {
+    @apply border-border;
+  }
 
-body {
-  margin: 0;
-  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
-  color: var(--ink-primary);
-  background: var(--surface);
-}
-
-a {
-  color: inherit;
-}
-
-button {
-  font-family: inherit;
-  font-size: 14px;
-  padding: 10px 16px;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  background: white;
-  cursor: pointer;
-}
-
-button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
+  body {
+    @apply bg-background text-foreground;
+  }
 }
