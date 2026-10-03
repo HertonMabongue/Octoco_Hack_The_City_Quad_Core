@@ -5,6 +5,7 @@ Run with: uvicorn main:app --reload --app-dir backend
 """
 from __future__ import annotations
 
+import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -15,6 +16,12 @@ from fastapi.staticfiles import StaticFiles
 from app import city_client, db, mock_generator, watchdog
 from app.config import get_settings
 from app.routers import alerts, bins, ingest, reports
+
+# Without this, our own logger.info()/logger.warning() calls across the
+# app are silently dropped — Python's root logger defaults to WARNING
+# with no handler, so even a successful MQTT connect or a connect
+# failure never reaches the console. This is what makes them visible.
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
 
 @asynccontextmanager
@@ -50,5 +57,5 @@ app.include_router(ingest.router)
 
 
 @app.get("/health", tags=["meta"])
-def health() -> dict[str, str]:
-    return {"status": "ok"}
+def health() -> dict[str, object]:
+    return {"status": "ok", "cityBroker": city_client.status()}

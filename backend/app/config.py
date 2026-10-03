@@ -2,9 +2,18 @@
 from __future__ import annotations
 
 from functools import lru_cache
+from pathlib import Path
 
 from pydantic import BaseModel
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# backend/ — computed from this file's own location, not the process's
+# current working directory. DB_PATH/UPLOAD_DIR default off this, so they
+# land in the same place whether uvicorn is launched from the repo root
+# or from inside backend/ itself (a relative "backend/data.sqlite3"
+# default would otherwise resolve to backend/backend/data.sqlite3 in the
+# latter case — this bit us for real, twice).
+BACKEND_DIR = Path(__file__).resolve().parent.parent
 
 
 class DeviceInfo(BaseModel):
@@ -28,9 +37,10 @@ class Settings(BaseSettings):
     city_http_host: str = "192.168.101.123"
     city_http_port: int = 8000
 
-    # Storage
-    db_path: str = "backend/data.sqlite3"
-    upload_dir: str = "backend/uploads"
+    # Storage — absolute, cwd-independent defaults (see BACKEND_DIR above).
+    # Override via .env if you actually want a different location.
+    db_path: str = str(BACKEND_DIR / "data.sqlite3")
+    upload_dir: str = str(BACKEND_DIR / "uploads")
 
     # Bin fill-level thresholds (percent full), mirrored on the frontend
     # in lib/constants.ts so both sides agree on what "critical" means.
