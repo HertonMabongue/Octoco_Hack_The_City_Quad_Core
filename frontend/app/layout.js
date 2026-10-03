@@ -1,8 +1,8 @@
 import "./globals.css";
 
 export const metadata = {
-  title: "River Corridor Dashboard",
-  description: "Live telemetry dashboard for sensor nodes",
+  title: "Clean Corridor",
+  description: "Bin overflow and littering monitoring for the Adam Tas Corridor",
 };
 
 export default function RootLayout({ children }) {

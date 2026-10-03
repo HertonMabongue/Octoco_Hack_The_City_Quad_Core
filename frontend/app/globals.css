@@ -1,51 +1,41 @@
+/* Minimal base styles. If create-next-app already generated a
+   globals.css with its own reset, merge the two rather than blindly
+   overwriting — keep one copy of `box-sizing` etc. */
+
 :root {
-  color-scheme: dark;
-  font-family: Arial, sans-serif;
+  --ink-primary: #0b0b0b;
+  --ink-secondary: #52514e;
+  --ink-muted: #898781;
+  --border: #e1e0d9;
+  --surface: #fcfcfb;
+}
+
+* {
+  box-sizing: border-box;
 }
 
 body {
   margin: 0;
-  background: #121417;
-  color: #e8ecf1;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  color: var(--ink-primary);
+  background: var(--surface);
 }
 
-.container {
-  max-width: 1100px;
-  margin: 0 auto;
-  padding: 1.25rem;
+a {
+  color: inherit;
 }
 
-.grid {
-  display: grid;
-  gap: 1rem;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+button {
+  font-family: inherit;
+  font-size: 14px;
+  padding: 10px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: white;
+  cursor: pointer;
 }
 
-.card {
-  background: #1e232a;
-  border: 1px solid #323b47;
-  border-radius: 10px;
-  padding: 0.75rem;
-}
-
-.card ul {
-  list-style: none;
-  margin: 0.6rem 0;
-  padding: 0;
-}
-
-.alerts {
-  background: #1e232a;
-  border: 1px solid #323b47;
-  border-radius: 10px;
-  padding: 0.75rem 1rem;
-}
-
-.muted {
-  color: #95a0b0;
-}
-
-.trends {
-  display: grid;
-  gap: 0.5rem;
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
