@@ -10,7 +10,7 @@ export default function NotFound() {
       className="container flex min-h-[70vh] flex-col items-center justify-center gap-4 py-20 text-center"
     >
       <MapPinOff className="h-10 w-10 text-muted-foreground" />
-      <h1 className="text-2xl font-semibold tracking-tight">Page not found</h1>
+      <h1 className="font-display text-2xl font-semibold tracking-tight">Page not found</h1>
       <p className="max-w-sm text-sm text-muted-foreground">
         That page doesn&apos;t exist, or it may have moved. Try one of these instead:
       </p>

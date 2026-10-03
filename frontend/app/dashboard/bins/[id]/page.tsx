@@ -3,7 +3,9 @@ import { notFound } from "next/navigation";
 import { Flame, ShieldAlert, Users } from "lucide-react";
 
 import FillLevelChart from "@/components/dashboard/FillLevelChart";
+import Tile from "@/components/dashboard/Tile";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { GAS_ALERT_RAW, STATUS_LABELS, TRAFFIC_HIGH_COUNT } from "@/lib/constants";
 import { getBin, getBinHistory } from "@/lib/api";
 
@@ -27,7 +29,7 @@ export default async function BinDetailPage({ params }: BinDetailPageProps) {
   return (
     <div>
       <div className="flex flex-wrap items-center gap-3">
-        <h1 className="text-2xl font-semibold tracking-tight">{bin.label}</h1>
+        <h1 className="font-display text-2xl font-semibold tracking-tight">{bin.label}</h1>
         <Badge variant={bin.status} dot>
           {STATUS_LABELS[bin.status]}
         </Badge>
@@ -42,43 +44,45 @@ export default async function BinDetailPage({ params }: BinDetailPageProps) {
           than just the fill chart, since an operator who opens a single
           bin wants the full picture, not only what triggered the overflow
           alert. */}
-      <dl className="mt-6 grid gap-3 sm:grid-cols-3">
-        <div className="rounded-lg border border-border p-3">
-          <dt className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <Flame className="h-3.5 w-3.5" /> Gas (raw)
-          </dt>
-          <dd className={`mt-1 text-lg font-semibold ${gasHazard ? "text-destructive" : ""}`}>
-            {bin.gasRaw ?? "—"}
-            {gasHazard && <span className="ml-2 text-xs font-normal">hazard</span>}
-          </dd>
-        </div>
-        <div className="rounded-lg border border-border p-3">
-          <dt className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <Users className="h-3.5 w-3.5" /> Traffic (10s window)
-          </dt>
-          <dd className={`mt-1 text-lg font-semibold ${highTraffic ? "text-destructive" : ""}`}>
-            {bin.peopleCount ?? "—"}
-            {highTraffic && <span className="ml-2 text-xs font-normal">high</span>}
-          </dd>
-        </div>
-        <div className="rounded-lg border border-border p-3">
-          <dt className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <ShieldAlert className="h-3.5 w-3.5" /> Movement
-          </dt>
-          <dd className={`mt-1 text-lg font-semibold ${bin.movementAlert ? "text-destructive" : ""}`}>
-            {bin.movementAlert == null ? "—" : bin.movementAlert ? "Tamper alert" : "Normal"}
-          </dd>
-        </div>
-      </dl>
-
-      <h2 className="mb-4 mt-8 text-base font-semibold">Fill level history</h2>
-      <div className="max-w-2xl">
-        {history.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No readings yet for this bin.</p>
-        ) : (
-          <FillLevelChart history={history} />
-        )}
+      <div className="mt-6 grid gap-3 sm:grid-cols-3">
+        <Tile
+          label="Gas (raw)"
+          icon={Flame}
+          tone={gasHazard ? "critical" : "default"}
+          value={bin.gasRaw != null ? String(bin.gasRaw) : "—"}
+          sub={gasHazard ? "above hazard threshold" : "normal"}
+        />
+        <Tile
+          label="Traffic (10s window)"
+          icon={Users}
+          tone={highTraffic ? "warning" : "default"}
+          value={bin.peopleCount != null ? String(bin.peopleCount) : "—"}
+          sub={highTraffic ? "high traffic" : "normal"}
+        />
+        <Tile
+          label="Movement"
+          icon={ShieldAlert}
+          tone={bin.movementAlert ? "critical" : "default"}
+          value={bin.movementAlert == null ? "—" : bin.movementAlert ? "Tamper" : "Normal"}
+          sub={bin.movementAlert ? "possible tamper event" : "no movement flagged"}
+        />
       </div>
+
+      <h2 className="mb-4 mt-8 font-display text-base font-semibold">Fill level history</h2>
+      <Card className="max-w-2xl">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-medium text-muted-foreground">
+            Last {history.length} readings
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="pt-0">
+          {history.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No readings yet for this bin.</p>
+          ) : (
+            <FillLevelChart history={history} />
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

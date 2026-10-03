@@ -19,7 +19,7 @@ export default async function InsightsPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-semibold tracking-tight">Insights</h1>
+      <h1 className="font-display text-2xl font-semibold tracking-tight">Insights</h1>
       <p className="mt-1 text-sm text-muted-foreground">
         Where collection effort is actually needed, and what that&apos;s worth in avoided trips.
       </p>
@@ -28,14 +28,14 @@ export default async function InsightsPage() {
         <CostSavingsTiles bins={bins} forecast={forecast} />
       </div>
 
-      <h2 className="mb-3 mt-10 text-base font-semibold">Collection forecast</h2>
+      <h2 className="mb-3 mt-10 font-display text-base font-semibold">Collection forecast</h2>
       <p className="mb-3 text-sm text-muted-foreground">
         Projected time until each bin reaches the collection threshold, from its recent fill
         history. Ranked by what needs attention soonest.
       </p>
       <ForecastTable forecast={forecast} />
 
-      <h2 className="mb-3 mt-10 text-base font-semibold">Fill trend by bin</h2>
+      <h2 className="mb-3 mt-10 font-display text-base font-semibold">Fill trend by bin</h2>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {binsWithHistory.map(({ bin, history }) => (
           <Card key={bin.id}>

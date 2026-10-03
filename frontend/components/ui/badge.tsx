@@ -3,18 +3,22 @@ import { cva, type VariantProps } from "class-variance-authority";
 
 import { cn } from "@/lib/utils";
 
+// A tag, not a pill — rounded-full status pills are the single most
+// recognizable "generated admin template" tell. Small rectangular chip,
+// uppercase, tracked-out letterspacing: reads as a status label on
+// physical equipment rather than a UI-kit default.
 const badgeVariants = cva(
-  "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
+  "inline-flex items-center gap-1.5 rounded-sm border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
   {
     variants: {
       variant: {
         default: "border-transparent bg-primary text-primary-foreground",
         secondary: "border-transparent bg-secondary text-secondary-foreground",
         destructive: "border-transparent bg-destructive text-destructive-foreground",
-        outline: "text-foreground",
-        good: "border-status-good/30 bg-status-good/10 text-status-good",
-        warning: "border-status-warning/30 bg-status-warning/10 text-status-warning",
-        critical: "border-status-critical/30 bg-status-critical/10 text-status-critical",
+        outline: "border-border text-foreground",
+        good: "border-status-good/25 bg-status-good/10 text-status-good",
+        warning: "border-status-warning/25 bg-status-warning/10 text-status-warning",
+        critical: "border-status-critical/25 bg-status-critical/10 text-status-critical",
       },
     },
     defaultVariants: {

@@ -34,7 +34,7 @@ export default function AutoRefresh() {
   return (
     <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
       <RotateCw className={cn("h-3 w-3", spinning && "animate-spin")} />
-      Live — updates every 30s
+      Live · updates every 30s
     </span>
   );
 }

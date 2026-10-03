@@ -16,9 +16,11 @@ export default function MobileNav() {
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="flex items-center justify-between border-b border-border p-4 lg:hidden">
-      <Link href="/" className="flex items-center gap-2 font-semibold">
-        <Recycle className="h-5 w-5 text-primary" />
+    <div className="flex items-center justify-between border-b border-border/60 bg-card p-4 lg:hidden">
+      <Link href="/" className="flex items-center gap-2.5 font-display text-[15px] font-semibold">
+        <span className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-primary-foreground">
+          <Recycle className="h-4 w-4" />
+        </span>
         Clean Corridor
       </Link>
 

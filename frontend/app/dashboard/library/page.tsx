@@ -16,7 +16,7 @@ export default async function LibraryPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-semibold tracking-tight">Library</h1>
+      <h1 className="font-display text-2xl font-semibold tracking-tight">Library</h1>
       <p className="mt-1 text-sm text-muted-foreground">
         Reports and incidents, the bin and sensor registry, and reference documents, all in one
         place.

@@ -12,7 +12,7 @@ export default function AssetRegistryTable({ bins }: { bins: Bin[] }) {
   }
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-border">
+    <div className="overflow-x-auto rounded-xl border border-border/60 bg-card shadow-card">
       <table className="w-full text-sm">
         <thead className="bg-secondary/50 text-left text-xs text-muted-foreground">
           <tr>

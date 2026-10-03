@@ -22,7 +22,7 @@ export default async function CommunityPage() {
     <div>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Bins near you</h1>
+          <h1 className="font-display text-2xl font-semibold tracking-tight">Bins near you</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             See which bins are filling up, or report a littered area.
           </p>
@@ -36,18 +36,18 @@ export default async function CommunityPage() {
         <BinsSummaryStrip bins={bins} />
       </div>
 
-      <div className="mt-4 h-72 min-w-0 sm:h-96">
+      <div className="mt-4 h-72 min-w-0 overflow-hidden rounded-xl border border-border/60 shadow-card sm:h-96">
         <BinMapLoader bins={bins} />
       </div>
-      <div className="mt-2">
+      <div className="mt-3">
         <MapLegend />
       </div>
 
       {bins.length === 0 ? (
         <p className="mt-6 text-sm text-muted-foreground">No bins reporting yet.</p>
       ) : (
-        <div className="mt-6 overflow-hidden rounded-lg border border-border">
-          <ul className="divide-y divide-border">
+        <div className="mt-6 overflow-hidden rounded-xl border border-border/60 bg-card shadow-card">
+          <ul className="divide-y divide-border/60">
             {bins.map((bin, i) => (
               <li
                 key={bin.id}

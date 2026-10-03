@@ -17,7 +17,7 @@ export default function CommunityError({
   }, [error]);
 
   return (
-    <div className="flex flex-col items-start gap-3 rounded-lg border border-destructive/30 bg-destructive/5 p-6">
+    <div className="flex flex-col items-start gap-3 rounded-xl border border-destructive/30 bg-destructive/5 p-6 shadow-card">
       <AlertTriangle className="h-6 w-6 text-destructive" />
       <div>
         <h2 className="font-semibold">Something went wrong</h2>

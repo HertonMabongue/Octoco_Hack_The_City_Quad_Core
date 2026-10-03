@@ -1,5 +1,9 @@
+import { Banknote, CalendarCheck, PackageCheck, Truck } from "lucide-react";
+
 import { ASSUMED_COST_PER_TRIP_ZAR, FIXED_SCHEDULE_VISITS_PER_WEEK } from "@/lib/constants";
 import type { Bin, ForecastPoint } from "@/lib/types";
+
+import Tile from "./Tile";
 
 const WEEK_HOURS = 24 * 7;
 
@@ -21,37 +25,26 @@ export default function CostSavingsTiles({ bins, forecast }: { bins: Bin[]; fore
   return (
     <div>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Tile label="Fixed roster baseline" value={`${scheduledTrips}/wk`} />
-        <Tile label="Collections actually needed" value={`${neededTrips}/wk`} />
-        <Tile label="Trips saved by need, not schedule" value={String(tripsSaved)} tone="good" />
+        <Tile label="Fixed roster baseline" value={`${scheduledTrips}/wk`} icon={CalendarCheck} />
+        <Tile label="Collections actually needed" value={`${neededTrips}/wk`} icon={PackageCheck} />
+        <Tile
+          label="Trips saved by need, not schedule"
+          value={String(tripsSaved)}
+          icon={Truck}
+          tone="good"
+        />
         <Tile
           label="Estimated weekly savings"
           value={`R${savingsZAR.toLocaleString("en-ZA")}`}
+          icon={Banknote}
           tone="good"
         />
       </div>
-      <p className="mt-2 text-xs text-muted-foreground">
+      <p className="mt-3 text-xs text-muted-foreground">
         Assumes a fixed roster of {FIXED_SCHEDULE_VISITS_PER_WEEK}x/week per bin and R
         {ASSUMED_COST_PER_TRIP_ZAR} per collection trip. Tune both in lib/constants.ts to the
         municipality&apos;s real schedule and cost.
       </p>
-    </div>
-  );
-}
-
-function Tile({ label, value, tone }: { label: string; value: string; tone?: "good" }) {
-  return (
-    <div
-      className={
-        tone === "good"
-          ? "rounded-lg border border-status-good/30 bg-status-good/5 p-4"
-          : "rounded-lg border border-border p-4"
-      }
-    >
-      <div className="text-xs text-muted-foreground">{label}</div>
-      <div className="mt-1.5 font-mono text-2xl font-semibold tabular-nums tracking-tight">
-        {value}
-      </div>
     </div>
   );
 }

@@ -11,16 +11,16 @@ import SectionLabel from "./SectionLabel";
 // with it below the lg breakpoint.
 export default function DashboardTopbar({ username }: { username: string }) {
   return (
-    <header className="hidden h-14 shrink-0 items-center justify-between gap-4 border-b border-border px-6 lg:flex">
+    <header className="hidden h-14 shrink-0 items-center justify-between gap-4 border-b border-border/60 bg-card/60 px-6 backdrop-blur lg:flex">
       <SectionLabel />
 
-      <div className="flex items-center gap-4">
-        <span className="hidden items-center gap-1.5 font-mono text-xs text-muted-foreground sm:flex">
-          <span className="relative flex h-2 w-2">
+      <div className="flex items-center gap-3">
+        <span className="hidden items-center gap-1.5 rounded-sm bg-status-good/10 px-2 py-1 font-mono text-[10px] font-semibold uppercase tracking-wide text-status-good sm:flex">
+          <span className="relative flex h-1.5 w-1.5">
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-status-good opacity-75" />
-            <span className="relative inline-flex h-2 w-2 rounded-full bg-status-good" />
+            <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-status-good" />
           </span>
-          LIVE
+          Live
         </span>
 
         <AlertBell />

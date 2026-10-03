@@ -4,108 +4,124 @@
 
 @layer base {
   :root {
-    --background: 40 20% 99%;
+    /* Canvas sits a step darker than card surfaces so panels read as
+       raised, physical objects rather than flat boxes drawn on top of
+       an identical background — the thing that made the old flat-border
+       layout read as a wireframe instead of a finished product. */
+    --background: 40 18% 95%;
     --foreground: 20 14% 4%;
 
-    --card: 0 0% 100%;
+    --card: 40 25% 99%;
     --card-foreground: 20 14% 4%;
 
-    --popover: 0 0% 100%;
+    --popover: 40 25% 99%;
     --popover-foreground: 20 14% 4%;
 
-    --primary: 142 71% 29%;
+    --primary: 142 71% 27%;
     --primary-foreground: 0 0% 98%;
 
-    --secondary: 40 14% 94%;
+    --secondary: 40 14% 91%;
     --secondary-foreground: 20 14% 10%;
 
-    --muted: 40 14% 94%;
-    --muted-foreground: 25 8% 45%;
+    --muted: 40 14% 91%;
+    --muted-foreground: 25 8% 42%;
 
-    --accent: 40 14% 94%;
-    --accent-foreground: 20 14% 10%;
+    --accent: 142 25% 92%;
+    --accent-foreground: 142 50% 18%;
 
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 98%;
 
-    --border: 30 10% 88%;
-    --input: 30 10% 88%;
-    --ring: 142 71% 29%;
+    --border: 30 12% 86%;
+    --input: 30 12% 86%;
+    --ring: 142 71% 27%;
 
-    --status-good: 142 71% 35%;
-    --status-warning: 38 92% 50%;
-    --status-critical: 0 72% 51%;
+    --status-good: 142 65% 32%;
+    --status-warning: 32 92% 46%;
+    --status-critical: 2 72% 48%;
 
-    --radius: 0.75rem;
+    --radius: 0.625rem;
+
+    --shadow-color: 30 25% 12%;
+    --shadow-card: 0 1px 2px hsl(var(--shadow-color) / 0.04), 0 10px 24px -12px hsl(var(--shadow-color) / 0.16);
+    --shadow-card-hover: 0 2px 4px hsl(var(--shadow-color) / 0.06), 0 16px 32px -14px hsl(var(--shadow-color) / 0.22);
   }
 
   :root[data-theme="dark"] {
-    --background: 20 14% 6%;
+    --background: 20 16% 7%;
     --foreground: 40 10% 96%;
 
-    --card: 20 14% 8%;
+    --card: 20 15% 10%;
     --card-foreground: 40 10% 96%;
 
-    --popover: 20 14% 8%;
+    --popover: 20 15% 10%;
     --popover-foreground: 40 10% 96%;
 
-    --primary: 142 60% 45%;
-    --primary-foreground: 20 14% 6%;
+    --primary: 142 55% 48%;
+    --primary-foreground: 20 20% 8%;
 
-    --secondary: 20 10% 14%;
+    --secondary: 20 10% 15%;
     --secondary-foreground: 40 10% 96%;
 
-    --muted: 20 10% 14%;
-    --muted-foreground: 30 8% 65%;
+    --muted: 20 10% 15%;
+    --muted-foreground: 30 8% 63%;
 
-    --accent: 20 10% 16%;
-    --accent-foreground: 40 10% 96%;
+    --accent: 142 20% 16%;
+    --accent-foreground: 142 45% 75%;
 
-    --destructive: 0 63% 40%;
+    --destructive: 0 63% 42%;
     --destructive-foreground: 40 10% 96%;
 
-    --border: 20 10% 18%;
-    --input: 20 10% 18%;
-    --ring: 142 60% 45%;
+    --border: 20 10% 19%;
+    --input: 20 10% 19%;
+    --ring: 142 55% 48%;
 
-    --status-good: 142 60% 45%;
-    --status-warning: 38 92% 55%;
-    --status-critical: 0 72% 58%;
+    --status-good: 142 55% 46%;
+    --status-warning: 36 90% 58%;
+    --status-critical: 4 78% 62%;
+
+    --shadow-color: 0 0% 0%;
+    --shadow-card: 0 1px 2px hsl(var(--shadow-color) / 0.3), 0 10px 28px -10px hsl(var(--shadow-color) / 0.55);
+    --shadow-card-hover: 0 2px 4px hsl(var(--shadow-color) / 0.35), 0 18px 36px -12px hsl(var(--shadow-color) / 0.6);
   }
 
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
-      --background: 20 14% 6%;
+      --background: 20 16% 7%;
       --foreground: 40 10% 96%;
 
-      --card: 20 14% 8%;
+      --card: 20 15% 10%;
       --card-foreground: 40 10% 96%;
 
-      --popover: 20 14% 8%;
+      --popover: 20 15% 10%;
       --popover-foreground: 40 10% 96%;
 
-      --primary: 142 60% 45%;
-      --primary-foreground: 20 14% 6%;
+      --primary: 142 55% 48%;
+      --primary-foreground: 20 20% 8%;
 
-      --secondary: 20 10% 14%;
+      --secondary: 20 10% 15%;
       --secondary-foreground: 40 10% 96%;
 
-      --muted: 20 10% 14%;
-      --muted-foreground: 30 8% 65%;
+      --muted: 20 10% 15%;
+      --muted-foreground: 30 8% 63%;
 
-      --accent: 20 10% 16%;
-      --accent-foreground: 40 10% 96%;
+      --accent: 142 20% 16%;
+      --accent-foreground: 142 45% 75%;
 
-      --destructive: 0 63% 40%;
+      --destructive: 0 63% 42%;
       --destructive-foreground: 40 10% 96%;
 
-      --border: 20 10% 18%;
-      --input: 20 10% 18%;
-      --ring: 142 60% 45%;
+      --border: 20 10% 19%;
+      --input: 20 10% 19%;
+      --ring: 142 55% 48%;
 
-      --status-good: 142 60% 45%;
-      --status-warning: 38 92% 55%;
-      --status-critical: 0 72% 58%;
+      --status-good: 142 55% 46%;
+      --status-warning: 36 90% 58%;
+      --status-critical: 4 78% 62%;
+
+      --shadow-color: 0 0% 0%;
+      --shadow-card: 0 1px 2px hsl(var(--shadow-color) / 0.3), 0 10px 28px -10px hsl(var(--shadow-color) / 0.55);
+      --shadow-card-hover: 0 2px 4px hsl(var(--shadow-color) / 0.35), 0 18px 36px -12px hsl(var(--shadow-color) / 0.6);
     }
   }
 }
@@ -117,5 +133,17 @@
 
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+@layer utilities {
+  /* A faint dot grid for surfaces that want a "control panel" texture
+     without a stock illustration or gradient blob — used on the two
+     surfaces that are a fixed dark panel regardless of light/dark theme
+     (the homepage device readout, the login screen), so the dots are a
+     flat white value rather than the theme-following --foreground. */
+  .bg-grid-dots {
+    background-image: radial-gradient(rgb(255 255 255 / 0.07) 1px, transparent 1px);
+    background-size: 16px 16px;
   }
 }

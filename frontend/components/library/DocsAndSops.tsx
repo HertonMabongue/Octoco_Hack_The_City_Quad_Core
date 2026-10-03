@@ -71,7 +71,7 @@ const DOCS: Doc[] = [
 
 export default function DocsAndSops() {
   return (
-    <div className="divide-y divide-border rounded-lg border border-border">
+    <div className="divide-y divide-border/60 rounded-xl border border-border/60 bg-card shadow-card">
       {DOCS.map((doc) => (
         <details key={doc.title} className="group p-4">
           <summary className="flex cursor-pointer list-none items-center justify-between gap-3">

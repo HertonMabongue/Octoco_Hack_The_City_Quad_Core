@@ -28,10 +28,20 @@ export default function SidebarNav({ onNavigate }: { onNavigate?: () => void }) 
 
   return (
     <nav className="flex flex-1 flex-col">
-      <Link href="/" onClick={onNavigate} className="mb-8 flex items-center gap-2 font-semibold">
-        <Recycle className="h-5 w-5 text-primary" />
+      <Link
+        href="/"
+        onClick={onNavigate}
+        className="mb-8 flex items-center gap-2.5 font-display text-[15px] font-semibold"
+      >
+        <span className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-primary-foreground">
+          <Recycle className="h-4 w-4" />
+        </span>
         Clean Corridor
       </Link>
+
+      <span className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+        Operate
+      </span>
 
       {LINKS.map((link) => {
         const active = link.exact ? pathname === link.href : pathname.startsWith(link.href);
@@ -42,11 +52,16 @@ export default function SidebarNav({ onNavigate }: { onNavigate?: () => void }) 
             onClick={onNavigate}
             aria-current={active ? "page" : undefined}
             className={cn(
-              "mb-1 flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium hover:bg-accent",
-              active ? "bg-accent text-foreground" : "text-muted-foreground hover:text-foreground"
+              "relative mb-0.5 flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+              active
+                ? "bg-accent text-accent-foreground"
+                : "text-muted-foreground hover:bg-accent/50 hover:text-foreground"
             )}
           >
-            <link.icon className="h-4 w-4" />
+            {active && (
+              <span className="absolute left-0 top-1/2 h-4 w-0.5 -translate-y-1/2 rounded-full bg-primary" />
+            )}
+            <link.icon className="h-4 w-4 shrink-0" />
             {link.label}
           </Link>
         );
@@ -55,7 +70,7 @@ export default function SidebarNav({ onNavigate }: { onNavigate?: () => void }) 
       <Link
         href="/"
         onClick={onNavigate}
-        className="mt-auto flex items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-foreground"
+        className="mt-auto flex items-center gap-2.5 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent/50 hover:text-foreground"
       >
         <ArrowLeft className="h-4 w-4" />
         Back to home

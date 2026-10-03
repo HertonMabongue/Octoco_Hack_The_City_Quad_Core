@@ -5,6 +5,7 @@ import { AlertTriangle, Camera, Check, Flame, Loader2, ShieldAlert, WifiOff } fr
 
 import { Button } from "@/components/ui/button";
 import { resolveAlert } from "@/lib/api";
+import { cn } from "@/lib/utils";
 import type { Alert, AlertType } from "@/lib/types";
 
 const ALERT_ICON: Record<AlertType, typeof AlertTriangle> = {
@@ -13,6 +14,14 @@ const ALERT_ICON: Record<AlertType, typeof AlertTriangle> = {
   offline: WifiOff,
   hazard: Flame,
   tamper: ShieldAlert,
+};
+
+const ALERT_TONE: Record<AlertType, string> = {
+  overflow: "bg-status-warning/10 text-status-warning",
+  littering: "bg-secondary text-foreground",
+  offline: "bg-muted text-muted-foreground",
+  hazard: "bg-status-critical/10 text-status-critical",
+  tamper: "bg-status-critical/10 text-status-critical",
 };
 
 // A chronological feed of alerts — bin overflows and community littering
@@ -37,18 +46,23 @@ export default function AlertFeed({ alerts: initialAlerts }: { alerts: Alert[] }
   }
 
   return (
-    <ul className="flex flex-col divide-y divide-border">
+    <ul className="flex flex-col divide-y divide-border/60">
       {alerts.map((alert) => {
         const Icon = ALERT_ICON[alert.type] ?? AlertTriangle;
         const isResolving = resolvingId === alert.id;
         return (
           <li key={alert.id} className="flex items-start gap-3 py-3 text-sm">
-            <Icon className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+            <span
+              className={cn(
+                "flex h-7 w-7 shrink-0 items-center justify-center rounded-md",
+                ALERT_TONE[alert.type]
+              )}
+            >
+              <Icon className="h-3.5 w-3.5" />
+            </span>
             <div className="min-w-0 flex-1">
-              <span className="font-medium capitalize">{alert.type}</span>
-              {" — "}
-              {alert.message}
-              <div className="mt-0.5 text-xs text-muted-foreground">
+              <span className="font-medium capitalize">{alert.type}:</span> {alert.message}
+              <div className="mt-0.5 font-mono text-xs text-muted-foreground">
                 {new Date(alert.createdAt).toLocaleString()}
               </div>
             </div>

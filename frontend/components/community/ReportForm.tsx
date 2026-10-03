@@ -51,9 +51,9 @@ export default function ReportForm() {
 
   if (status === "done") {
     return (
-      <div className="flex items-start gap-3 rounded-lg border border-status-good/30 bg-status-good/10 p-4 text-sm">
+      <div className="flex items-start gap-3 rounded-xl border border-status-good/30 bg-status-good/10 p-4 text-sm">
         <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-status-good" />
-        <p>Thanks — your report was submitted and will show up on the municipal dashboard.</p>
+        <p>Thanks, your report was submitted and will show up on the municipal dashboard.</p>
       </div>
     );
   }
@@ -87,7 +87,7 @@ export default function ReportForm() {
       </Button>
 
       {status === "error" && (
-        <p className="text-sm text-destructive">Something went wrong — try again.</p>
+        <p className="text-sm text-destructive">Something went wrong. Try again.</p>
       )}
     </form>
   );

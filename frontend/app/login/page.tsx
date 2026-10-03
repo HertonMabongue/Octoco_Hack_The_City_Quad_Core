@@ -16,17 +16,17 @@ export default function LoginPage({
   searchParams: { from?: string };
 }) {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#0d120f] p-4">
+    <main className="bg-grid-dots flex min-h-screen items-center justify-center bg-[#0d120f] p-4">
       <div className="w-full max-w-sm rounded-xl border border-white/10 bg-background p-6 shadow-2xl sm:p-8">
-        <div className="mb-6 flex items-center gap-2">
-          <span className="flex h-9 w-9 items-center justify-center rounded-md bg-primary/10">
-            <Recycle className="h-5 w-5 text-primary" />
+        <div className="mb-6 flex items-center gap-2.5">
+          <span className="flex h-9 w-9 items-center justify-center rounded-md bg-primary text-primary-foreground">
+            <Recycle className="h-5 w-5" />
           </span>
           <div>
             <div className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
               Clean Corridor
             </div>
-            <h1 className="text-lg font-semibold leading-tight">Municipal access</h1>
+            <h1 className="font-display text-lg font-semibold leading-tight">Municipal access</h1>
           </div>
         </div>
 

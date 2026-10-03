@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 export default function ReportPage() {
   return (
     <div>
-      <h1 className="text-2xl font-semibold tracking-tight">Report a littered area</h1>
+      <h1 className="font-display text-2xl font-semibold tracking-tight">Report a littered area</h1>
       <p className="mt-1 text-sm text-muted-foreground">
         A photo and your location help the municipal team act on it faster.
       </p>

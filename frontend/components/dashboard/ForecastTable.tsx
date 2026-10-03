@@ -26,29 +26,29 @@ export default function ForecastTable({ forecast }: { forecast: ForecastPoint[] 
   }
 
   return (
-    <div className="overflow-hidden rounded-lg border border-border">
+    <div className="overflow-hidden rounded-xl border border-border/60 bg-card shadow-card">
       <table className="w-full text-sm">
-        <thead className="bg-secondary/50 text-left text-xs text-muted-foreground">
+        <thead className="text-left text-[11px] uppercase tracking-wide text-muted-foreground">
           <tr>
-            <th className="px-4 py-2.5 font-medium">Bin</th>
-            <th className="px-4 py-2.5 font-medium">Projected time to collection</th>
-            <th className="px-4 py-2.5 font-medium">Risk</th>
-            <th className="px-4 py-2.5 font-medium">Source</th>
+            <th className="px-4 py-3 font-semibold">Bin</th>
+            <th className="px-4 py-3 font-semibold">Projected time to collection</th>
+            <th className="px-4 py-3 font-semibold">Risk</th>
+            <th className="px-4 py-3 font-semibold">Source</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-border">
+        <tbody className="divide-y divide-border/60">
           {sorted.map((f) => (
-            <tr key={f.binId}>
-              <td className="px-4 py-2.5 font-medium">{f.label}</td>
-              <td className="px-4 py-2.5 font-mono tabular-nums">
+            <tr key={f.binId} className="transition-colors hover:bg-secondary/30">
+              <td className="px-4 py-3 font-medium">{f.label}</td>
+              <td className="px-4 py-3 font-mono tabular-nums">
                 {f.predictedFullInHours == null ? "N/A" : `${f.predictedFullInHours}h`}
               </td>
-              <td className="px-4 py-2.5">
+              <td className="px-4 py-3">
                 <Badge variant={RISK_BADGE_VARIANT[f.riskLevel]} dot>
                   {RISK_LABELS[f.riskLevel]}
                 </Badge>
               </td>
-              <td className="px-4 py-2.5">
+              <td className="px-4 py-3">
                 <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
                   {f.source === "model" ? (
                     <Sparkles className="h-3 w-3" />
