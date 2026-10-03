@@ -26,6 +26,36 @@ def fill_status(fill_pct: float, settings: Settings) -> str:
     return "good"
 
 
+def gas_alert(gas_raw: int | None, settings: Settings) -> bool:
+    return gas_raw is not None and gas_raw >= settings.gas_alert_raw
+
+
+def select_city_metrics(device_id: str, metrics: dict[str, Any]) -> dict[str, float]:
+    """The city protocol wants exactly uptime_s + 3 numeric metrics,
+    prioritized by impact. Four independent sensors can report in any
+    given reading (see firmware/src/OctocoEsp32Project.ino), so this picks
+    the three that matter most rather than forwarding whatever happened to
+    arrive: fill level (the core overflow problem), the gas reading
+    (safety hazard — highest-impact when present), then traffic (useful
+    collection-planning signal). Movement/tamper is deliberately NOT one
+    of the three — it already drives `mode` below, which is the channel
+    the brief gives for exactly this kind of state change, and it isn't
+    numeric in any meaningful unit.
+
+    Booleans never go in this dict — the brief requires numeric-only
+    values, and overflow_flag/movement_alert are both booleans. A missing
+    optional sensor is reported as 0, not omitted, so the city always sees
+    the same 3 keys from this device regardless of which subsystems
+    reported this tick.
+    """
+    return {
+        "uptime_s": int(metrics["uptime_s"]),
+        "fill_pct": round(float(metrics["fill_pct"]), 1),
+        "gas_raw": int(metrics.get("gas_raw") or 0),
+        "people_count": int(metrics.get("people_count") or 0),
+    }
+
+
 def record_reading(device_id: str, metrics: dict[str, Any]) -> None:
     settings = get_settings()
     missing = [field for field in REQUIRED_METRICS if field not in metrics]
@@ -34,17 +64,32 @@ def record_reading(device_id: str, metrics: dict[str, Any]) -> None:
 
     db.insert_reading(device_id, metrics)
 
-    status = fill_status(float(metrics["fill_pct"]), settings)
-    if status == "critical" and not db.recent_alert_exists(device_id, "overflow"):
+    fill = fill_status(float(metrics["fill_pct"]), settings)
+    hazard = gas_alert(metrics.get("gas_raw"), settings)
+    tamper = bool(metrics.get("movement_alert"))
+
+    if fill == "critical" and not db.recent_alert_exists(device_id, "overflow"):
         db.insert_alert(
             device_id, "overflow", f"Bin {device_id} is {metrics['fill_pct']:.0f}% full — needs collection"
         )
+    if hazard and not db.recent_alert_exists(device_id, "hazard"):
+        db.insert_alert(device_id, "hazard", f"Bin {device_id} gas reading at {metrics['gas_raw']} — possible hazard")
+    if tamper and not db.recent_alert_exists(device_id, "tamper"):
+        db.insert_alert(device_id, "tamper", f"Bin {device_id} unusual movement detected — possible tamper/theft")
 
-    new_mode = "emergency" if status == "critical" else "normal"
+    # Mode priority mirrors the firmware's own OLED priority order (see the
+    # file header comment in OctocoEsp32Project.ino): gas > movement > bin
+    # full > normal. Keeping the two in sync means a bin's physical display
+    # and its dashboard/city state never disagree about what's most urgent.
+    if hazard or tamper or fill == "critical":
+        new_mode = "emergency"
+    else:
+        new_mode = "normal"
+
     prev_connection, prev_mode = db.get_device_status(device_id)
 
     db.upsert_device_status(device_id, "online", new_mode)
-    city_client.publish_telemetry(device_id, metrics)
+    city_client.publish_telemetry(device_id, select_city_metrics(device_id, metrics))
 
     # Status is retained on the city broker, so we only need to republish
     # it on a real change (initial handshake or a mode toggle) rather than

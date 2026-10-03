@@ -33,9 +33,7 @@ frontend; Pydantic + typed FastAPI routers on the backend. The same
 (`backend/app/models.py`) and TypeScript interfaces
 (`frontend/lib/types.ts`) — keep both in sync.
 
-**Deployment:** frontend-only on Vercel, **https://kleanclorridor.vercel.app**
-(the backend needs a persistent MQTT connection + local DB, which doesn't
-fit serverless — it runs wherever the live demo runs).
+**Deployment:** frontend on Vercel, **https://kleanclorridor.vercel.app**
 
 ## City mainframe integration
 
@@ -103,7 +101,7 @@ against `FILL_WARNING_PCT`/`FILL_CRITICAL_PCT` — tune in
 The frontend falls back to mock data if the backend is unreachable, so
 either side works standalone.
 
-## Setup
+## For Quick Start
 
 ```bash
 ./start.sh
@@ -160,12 +158,3 @@ npm run dev        # or: lint / typecheck / build / format
 predicts a bin's time-to-full from its fill-history (`app.db.history()`),
 so collection can be scheduled before a bin overflows instead of after.
 Not started — see `backend/app/forecasting/README.md` before picking it up.
-
-## The deal
-
-**Hardware-as-a-service**: we own/maintain the sensor nodes and
-platform; the municipality pays a per-bin subscription (no capital
-outlay). The Adam Tas Corridor redevelopment is the pilot — new bins
-specified with sensors built in from the start, extending corridor-wide
-and then town-wide on success. IP stays with the team/Octoco, licensed
-to the municipality for the contract term.

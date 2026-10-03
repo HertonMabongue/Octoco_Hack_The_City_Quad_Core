@@ -43,6 +43,9 @@ def _to_bin(device_id: str, reading: dict | None) -> Bin:
         distanceCm=reading.get("distance_cm"),
         overflowFlag=reading.get("overflow_flag"),
         uptimeS=reading.get("uptime_s"),
+        gasRaw=reading.get("gas_raw"),
+        peopleCount=reading.get("people_count"),
+        movementAlert=reading.get("movement_alert"),
     )
 
 

@@ -9,6 +9,10 @@ import type { Alert, Bin, BinHistoryPoint, ReportInput, ReportResult } from "./t
 // Called from Server Components (dashboard/community pages) as well as
 // client components, so it only relies on the standard `fetch` global.
 
+// Covers all four of the firmware's independent subsystems (fill, gas,
+// traffic, movement — see firmware/src/OctocoEsp32Project.ino), not just
+// fill level, so the dashboard looks and behaves the same way in mock mode
+// as it will once real sensor data arrives.
 const MOCK_BINS: Bin[] = [
   {
     id: "bin-01",
@@ -20,6 +24,9 @@ const MOCK_BINS: Bin[] = [
     mode: "normal",
     connection: "online",
     lastUpdated: new Date().toISOString(),
+    gasRaw: 210,
+    peopleCount: 3,
+    movementAlert: false,
   },
   {
     id: "bin-02",
@@ -31,6 +38,9 @@ const MOCK_BINS: Bin[] = [
     mode: "normal",
     connection: "online",
     lastUpdated: new Date().toISOString(),
+    gasRaw: 340,
+    peopleCount: 7,
+    movementAlert: false,
   },
   {
     id: "bin-03",
@@ -42,6 +52,9 @@ const MOCK_BINS: Bin[] = [
     mode: "emergency",
     connection: "online",
     lastUpdated: new Date().toISOString(),
+    gasRaw: 890,
+    peopleCount: 1,
+    movementAlert: true,
   },
 ];
 
@@ -56,6 +69,22 @@ const MOCK_ALERTS: Alert[] = [
   },
   {
     id: "a2",
+    binId: "bin-03",
+    type: "hazard",
+    message: "Bin bin-03 gas reading at 890 — possible hazard",
+    createdAt: new Date().toISOString(),
+    resolved: false,
+  },
+  {
+    id: "a3",
+    binId: "bin-03",
+    type: "tamper",
+    message: "Bin bin-03 unusual movement detected — possible tamper/theft",
+    createdAt: new Date().toISOString(),
+    resolved: false,
+  },
+  {
+    id: "a4",
     binId: "bin-02",
     type: "littering",
     message: "Community report: littering nearby",

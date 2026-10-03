@@ -1,14 +1,21 @@
 import Link from "next/link";
-import { WifiOff } from "lucide-react";
+import { Flame, ShieldAlert, Users, WifiOff } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { STATUS_LABELS } from "@/lib/constants";
+import { GAS_ALERT_RAW, STATUS_LABELS, TRAFFIC_HIGH_COUNT } from "@/lib/constants";
 import type { Bin } from "@/lib/types";
 
-// One bin, summarised: fill-level bar + status badge. Used in the ops
-// dashboard list and reused wherever a compact bin summary is needed.
+// One bin, summarised: fill-level bar + status badge, plus the bin's other
+// three independent sensors (gas, traffic, movement — see
+// firmware/src/OctocoEsp32Project.ino) when they have something notable to
+// say. Kept conditional rather than four badges on every card: most ticks
+// have nothing hazard/tamper-worthy to report, and a card that shouts
+// about every sensor every time trains operators to tune all of it out.
 export default function BinStatusCard({ bin }: { bin: Bin }) {
+  const gasHazard = bin.gasRaw != null && bin.gasRaw >= GAS_ALERT_RAW;
+  const highTraffic = bin.peopleCount != null && bin.peopleCount >= TRAFFIC_HIGH_COUNT;
+
   return (
     <Link href={`/dashboard/bins/${bin.id}`} className="block">
       <Card className="transition-colors hover:border-primary/50">
@@ -37,6 +44,29 @@ export default function BinStatusCard({ bin }: { bin: Bin }) {
             <span>{bin.fillPct}% full</span>
             <span className="capitalize">{bin.mode} mode</span>
           </div>
+
+          {(bin.movementAlert || gasHazard || highTraffic) && (
+            <div className="mt-2.5 flex flex-wrap gap-1.5">
+              {bin.movementAlert && (
+                <Badge variant="critical" className="gap-1">
+                  <ShieldAlert className="h-3 w-3" />
+                  Possible tamper
+                </Badge>
+              )}
+              {gasHazard && (
+                <Badge variant="critical" className="gap-1">
+                  <Flame className="h-3 w-3" />
+                  Gas hazard
+                </Badge>
+              )}
+              {highTraffic && (
+                <Badge variant="secondary" className="gap-1">
+                  <Users className="h-3 w-3" />
+                  High traffic
+                </Badge>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
     </Link>

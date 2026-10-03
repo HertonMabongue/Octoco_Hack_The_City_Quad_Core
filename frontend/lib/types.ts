@@ -18,6 +18,12 @@ export interface Bin {
   distanceCm?: number | null;
   overflowFlag?: boolean | null;
   uptimeS?: number | null;
+  // The other three independent sensor subsystems the hardware actually
+  // carries (see firmware/src/OctocoEsp32Project.ino) — each optional
+  // since a bin reports whichever of its four subsystems are fitted.
+  gasRaw?: number | null;
+  peopleCount?: number | null;
+  movementAlert?: boolean | null;
 }
 
 export interface BinHistoryPoint {
@@ -25,7 +31,7 @@ export interface BinHistoryPoint {
   fillPct: number;
 }
 
-export type AlertType = "overflow" | "littering" | "offline";
+export type AlertType = "overflow" | "littering" | "offline" | "hazard" | "tamper";
 
 export interface Alert {
   id: string;

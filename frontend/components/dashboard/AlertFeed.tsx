@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { AlertTriangle, Camera, Check, Loader2, WifiOff } from "lucide-react";
+import { AlertTriangle, Camera, Check, Flame, Loader2, ShieldAlert, WifiOff } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { resolveAlert } from "@/lib/api";
@@ -11,6 +11,8 @@ const ALERT_ICON: Record<AlertType, typeof AlertTriangle> = {
   overflow: AlertTriangle,
   littering: Camera,
   offline: WifiOff,
+  hazard: Flame,
+  tamper: ShieldAlert,
 };
 
 // A chronological feed of alerts — bin overflows and community littering

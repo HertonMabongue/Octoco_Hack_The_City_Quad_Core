@@ -47,6 +47,17 @@ class Settings(BaseSettings):
     fill_warning_pct: float = 60.0
     fill_critical_pct: float = 85.0
 
+    # Raw ADC alert threshold for the gas sensor — mirrors GAS_THRESHOLD in
+    # firmware/src/OctocoEsp32Project.ino. Not a calibrated ppm value, same
+    # caveat as the firmware comment: a prototype alert level based on the
+    # raw electrical reading.
+    gas_alert_raw: int = 800
+
+    # PIR traffic events per ~10s window considered "high" — mirrors
+    # TRAFFIC_THRESHOLD in the same firmware file. Display-only; doesn't
+    # drive mode/alerts.
+    traffic_high_count: int = 5
+
     max_history_points: int = 50
 
     cors_origins: list[str] = ["*"]

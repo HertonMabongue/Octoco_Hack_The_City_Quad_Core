@@ -32,6 +32,13 @@ export function fillStatus(fillPct: number): BinStatus {
   return "good";
 }
 
+// Mirrors backend/app/config.py's gas_alert_raw / traffic_high_count,
+// which mirror the firmware's own GAS_THRESHOLD / TRAFFIC_THRESHOLD in
+// turn — display-only here (the backend already decides alerts/mode), but
+// badges need the same numbers to explain *why* a reading looks notable.
+export const GAS_ALERT_RAW = 800;
+export const TRAFFIC_HIGH_COUNT = 5;
+
 // Where the FastAPI backend lives. Set per machine in .env.local —
 // never hardcode an IP here, it'll be wrong the moment anyone changes wifi.
 export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";

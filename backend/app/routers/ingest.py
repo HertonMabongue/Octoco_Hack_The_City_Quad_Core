@@ -25,6 +25,13 @@ class ReadingIn(BaseModel):
     fill_pct: float = Field(ge=0, le=100)
     distance_cm: float | None = None
     overflow_flag: bool | None = None
+    # The other three independent subsystems in
+    # firmware/src/OctocoEsp32Project.ino — each optional because the
+    # firmware itself treats them as independent (e.g. movement detection
+    # disables itself if no accelerometer is found, nothing else blocks).
+    gas_raw: int | None = Field(default=None, ge=0)
+    people_count: int | None = Field(default=None, ge=0)
+    movement_alert: bool | None = None
 
 
 @router.post("/{device_id}/readings", status_code=202)

@@ -43,10 +43,20 @@ def init_db() -> None:
               uptime_s INTEGER NOT NULL,
               fill_pct REAL NOT NULL,
               distance_cm REAL,
-              overflow_flag INTEGER
+              overflow_flag INTEGER,
+              gas_raw INTEGER,
+              people_count INTEGER,
+              movement_alert INTEGER
             )
             """
         )
+        # Migration for DBs created before the gas/traffic/movement columns
+        # existed (firmware originally shipped with ultrasonic-only data) —
+        # same "no ADD COLUMN IF NOT EXISTS" workaround as `resolved` below.
+        existing_reading_columns = {row[1] for row in con.execute("PRAGMA table_info(readings)").fetchall()}
+        for column in ("gas_raw", "people_count", "movement_alert"):
+            if column not in existing_reading_columns:
+                con.execute(f"ALTER TABLE readings ADD COLUMN {column} INTEGER")
         con.execute(
             """
             CREATE TABLE IF NOT EXISTS device_status (
@@ -98,11 +108,21 @@ def init_db() -> None:
 
 
 def insert_reading(device_id: str, metrics: dict[str, Any]) -> None:
+    # gas_raw/people_count/movement_alert are independently optional, same
+    # as the firmware's "four independent subsystems" design — a bin
+    # without a working accelerometer, say, still reports fill+gas+traffic.
+    gas_raw = metrics.get("gas_raw")
+    people_count = metrics.get("people_count")
+    movement_alert = metrics.get("movement_alert")
+
     with get_connection() as con:
         con.execute(
             """
-            INSERT INTO readings(device_id, ts, uptime_s, fill_pct, distance_cm, overflow_flag)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO readings(
+              device_id, ts, uptime_s, fill_pct, distance_cm, overflow_flag,
+              gas_raw, people_count, movement_alert
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 device_id,
@@ -111,6 +131,9 @@ def insert_reading(device_id: str, metrics: dict[str, Any]) -> None:
                 float(metrics["fill_pct"]),
                 metrics.get("distance_cm"),
                 int(bool(metrics.get("overflow_flag", 0))),
+                int(gas_raw) if gas_raw is not None else None,
+                int(people_count) if people_count is not None else None,
+                int(bool(movement_alert)) if movement_alert is not None else None,
             ),
         )
         con.commit()
@@ -151,7 +174,8 @@ def latest_reading_by_device() -> list[dict[str, Any]]:
     with get_connection() as con:
         rows = con.execute(
             """
-            SELECT r.device_id, r.ts, r.uptime_s, r.fill_pct, r.distance_cm, r.overflow_flag
+            SELECT r.device_id, r.ts, r.uptime_s, r.fill_pct, r.distance_cm, r.overflow_flag,
+                   r.gas_raw, r.people_count, r.movement_alert
             FROM readings r
             JOIN (
                 SELECT device_id, MAX(id) AS max_id
@@ -170,6 +194,9 @@ def latest_reading_by_device() -> list[dict[str, Any]]:
             "fill_pct": row[3],
             "distance_cm": row[4],
             "overflow_flag": bool(row[5]),
+            "gas_raw": row[6],
+            "people_count": row[7],
+            "movement_alert": bool(row[8]) if row[8] is not None else None,
         }
         for row in rows
     ]
@@ -179,7 +206,8 @@ def latest_reading(device_id: str) -> dict[str, Any] | None:
     with get_connection() as con:
         row = con.execute(
             """
-            SELECT ts, uptime_s, fill_pct, distance_cm, overflow_flag
+            SELECT ts, uptime_s, fill_pct, distance_cm, overflow_flag,
+                   gas_raw, people_count, movement_alert
             FROM readings WHERE device_id = ?
             ORDER BY id DESC LIMIT 1
             """,
@@ -194,6 +222,9 @@ def latest_reading(device_id: str) -> dict[str, Any] | None:
         "fill_pct": row[2],
         "distance_cm": row[3],
         "overflow_flag": bool(row[4]),
+        "gas_raw": row[5],
+        "people_count": row[6],
+        "movement_alert": bool(row[7]) if row[7] is not None else None,
     }
 
 

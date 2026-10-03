@@ -30,6 +30,12 @@ class Bin(CamelModel):
     distance_cm: float | None = Field(default=None, alias="distanceCm")
     overflow_flag: bool | None = Field(default=None, alias="overflowFlag")
     uptime_s: int | None = Field(default=None, alias="uptimeS")
+    # The other three independent sensor subsystems (see
+    # firmware/src/OctocoEsp32Project.ino) — each optional since a bin
+    # reports whichever of its four subsystems are actually fitted/working.
+    gas_raw: int | None = Field(default=None, alias="gasRaw")
+    people_count: int | None = Field(default=None, alias="peopleCount")
+    movement_alert: bool | None = Field(default=None, alias="movementAlert")
 
 
 class BinHistoryPoint(CamelModel):
@@ -40,7 +46,7 @@ class BinHistoryPoint(CamelModel):
 class Alert(CamelModel):
     id: str
     bin_id: str = Field(alias="binId")
-    type: Literal["overflow", "littering", "offline"]
+    type: Literal["overflow", "littering", "offline", "hazard", "tamper"]
     message: str
     created_at: str = Field(alias="createdAt")
     resolved: bool = False
