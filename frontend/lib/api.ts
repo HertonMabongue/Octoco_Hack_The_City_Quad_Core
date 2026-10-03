@@ -1,0 +1,111 @@
+import { API_URL } from "./constants";
+import type { Alert, Bin, BinHistoryPoint, ReportInput, ReportResult } from "./types";
+
+// Every network call the frontend makes goes through this file.
+// Each function tries the real backend first; if it's not reachable yet
+// (or the fetch fails), it falls back to mock data so the dashboard keeps
+// working on its own — the brief's "mock your data early" tip, applied on
+// the consuming side so frontend work isn't blocked on the backend/firmware.
+// Called from Server Components (dashboard/community pages) as well as
+// client components, so it only relies on the standard `fetch` global.
+
+const MOCK_BINS: Bin[] = [
+  {
+    id: "bin-01",
+    label: "Van der Stel St bin",
+    lat: -33.9346,
+    lng: 18.8653,
+    fillPct: 42,
+    status: "good",
+    mode: "normal",
+    connection: "online",
+    lastUpdated: new Date().toISOString(),
+  },
+  {
+    id: "bin-02",
+    label: "University Ave bin",
+    lat: -33.9337,
+    lng: 18.8661,
+    fillPct: 78,
+    status: "warning",
+    mode: "normal",
+    connection: "online",
+    lastUpdated: new Date().toISOString(),
+  },
+  {
+    id: "bin-03",
+    label: "Bergkelder corner bin",
+    lat: -33.9358,
+    lng: 18.8632,
+    fillPct: 93,
+    status: "critical",
+    mode: "emergency",
+    connection: "online",
+    lastUpdated: new Date().toISOString(),
+  },
+];
+
+const MOCK_ALERTS: Alert[] = [
+  {
+    id: "a1",
+    binId: "bin-03",
+    type: "overflow",
+    message: "Bin 93% full — needs collection",
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: "a2",
+    binId: "bin-02",
+    type: "littering",
+    message: "Community report: littering nearby",
+    createdAt: new Date().toISOString(),
+  },
+];
+
+async function safeFetch<T>(path: string, options?: RequestInit): Promise<T | null> {
+  try {
+    const res = await fetch(`${API_URL}${path}`, { cache: "no-store", ...options });
+    if (!res.ok) throw new Error(`Request failed: ${res.status}`);
+    return (await res.json()) as T;
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.warn(`[api] falling back to mock data for ${path}:`, message);
+    return null;
+  }
+}
+
+export async function getBins(): Promise<Bin[]> {
+  const data = await safeFetch<Bin[]>("/api/bins");
+  return data ?? MOCK_BINS;
+}
+
+export async function getBin(id: string): Promise<Bin | null> {
+  const data = await safeFetch<Bin>(`/api/bins/${id}`);
+  return data ?? MOCK_BINS.find((b) => b.id === id) ?? null;
+}
+
+export async function getBinHistory(id: string): Promise<BinHistoryPoint[]> {
+  const data = await safeFetch<BinHistoryPoint[]>(`/api/bins/${id}/history`);
+  if (data) return data;
+  // Mock a day of readings rising toward "now" so the chart has shape.
+  return Array.from({ length: 12 }, (_, i) => ({
+    timestamp: new Date(Date.now() - (11 - i) * 60 * 60 * 1000).toISOString(),
+    fillPct: Math.min(95, 10 + i * 7),
+  }));
+}
+
+export async function getAlerts(): Promise<Alert[]> {
+  const data = await safeFetch<Alert[]>("/api/alerts");
+  return data ?? MOCK_ALERTS;
+}
+
+export async function submitReport({ lat, lng, note, photo }: ReportInput): Promise<ReportResult> {
+  const formData = new FormData();
+  formData.append("lat", lat?.toString() ?? "");
+  formData.append("lng", lng?.toString() ?? "");
+  formData.append("note", note ?? "");
+  if (photo) formData.append("photo", photo);
+
+  const data = await safeFetch<ReportResult>("/api/reports", { method: "POST", body: formData });
+  return data ?? { id: `mock-${Date.now()}`, status: "queued" };
+}
