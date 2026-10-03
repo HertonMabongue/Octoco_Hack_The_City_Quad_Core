@@ -6,7 +6,9 @@ main backend stores and serves:
 
     GET /forecast                               one row per bin
     GET /forecast?leadHours=0.1                 same, with a custom alert lead time
+    GET /forecast/series                        the same rows plus fill history, for charts
     GET /forecast/placement?visitsPerHour=120   bin-placement estimate
+    GET /dashboard                              a live forecast chart page (dashboard.html)
     GET /health
 
 Run from the repo root (main backend on :8000, this on :8001):
@@ -24,10 +26,12 @@ from __future__ import annotations
 
 import os
 from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Literal
 
 from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from app.config import DEVICE_REGISTRY, device_info, get_settings
@@ -60,8 +64,22 @@ class BinForecast(BaseModel):
     # earliestFullAt is the low end of the range: plan collection by then.
     predictedFullAt: str | None = None
     earliestFullAt: str | None = None
+    latestFullAt: str | None = None
     collectSoon: bool = False
     lastReadingAt: str | None = None
+
+
+class HistoryPoint(BaseModel):
+    ts: str
+    fillPct: float
+
+
+class BinSeries(BinForecast):
+    """A forecast row plus what a chart needs: the readings the forecast
+    was made from, and the threshold it is forecasting towards."""
+
+    thresholdPct: float
+    history: list[HistoryPoint]
 
 
 class PlacementEstimate(BaseModel):
@@ -102,38 +120,70 @@ def _clock_time(last_reading_at: str | None, hours: float | None) -> str | None:
     return (datetime.fromisoformat(last_reading_at) + timedelta(hours=hours)).isoformat()
 
 
+def _bin_forecast(device_id: str, lead_hours: float) -> tuple[BinForecast, list[dict]]:
+    """One bin's forecast row, and the readings it was made from."""
+    settings = get_settings()
+    points = data.history_with_traffic(device_id, settings.max_history_points)
+    result = model.predict(points, settings.fill_critical_pct)
+    hours = result.get("hours")
+    hours_low = result.get("hours_low")
+    hours_high = result.get("hours_high")
+    last_reading_at = points[-1]["ts"] if points else None
+
+    row = BinForecast(
+        binId=device_id,
+        label=device_info(device_id).label,
+        status=result["status"],
+        predictedFullInHours=_round(hours),
+        predictedLowHours=_round(hours_low),
+        predictedHighHours=_round(hours_high),
+        riskLevel=_risk_level(hours),
+        fillPerVisitPct=_round(result.get("fill_per_visit_pct"), 3),
+        visitsPerHour=_round(result.get("visits_per_hour"), 1),
+        predictedFullAt=_clock_time(last_reading_at, hours),
+        earliestFullAt=_clock_time(last_reading_at, hours_low),
+        latestFullAt=_clock_time(last_reading_at, hours_high),
+        # Uses the earliest plausible time, not the median: a truck
+        # that's early costs little, a late one is an overflow.
+        collectSoon=hours_low is not None and hours_low <= lead_hours,
+        lastReadingAt=last_reading_at,
+    )
+    return row, points
+
+
 @app.get("/forecast", response_model=list[BinForecast])
 def get_forecast(
     lead_hours: float = Query(DEFAULT_LEAD_HOURS, alias="leadHours", ge=0),
 ) -> list[BinForecast]:
-    settings = get_settings()
-    out: list[BinForecast] = []
+    return [_bin_forecast(device_id, lead_hours)[0] for device_id in sorted(DEVICE_REGISTRY)]
+
+
+@app.get("/forecast/series", response_model=list[BinSeries])
+def get_forecast_series(
+    lead_hours: float = Query(DEFAULT_LEAD_HOURS, alias="leadHours", ge=0),
+) -> list[BinSeries]:
+    """Forecast rows with each bin's fill history attached, so a chart
+    can draw the readings and the projection from one request."""
+    threshold = get_settings().fill_critical_pct
+    out: list[BinSeries] = []
     for device_id in sorted(DEVICE_REGISTRY):
-        points = data.history_with_traffic(device_id, settings.max_history_points)
-        result = model.predict(points, settings.fill_critical_pct)
-        hours = result.get("hours")
-        hours_low = result.get("hours_low")
-        last_reading_at = points[-1]["ts"] if points else None
+        row, points = _bin_forecast(device_id, lead_hours)
         out.append(
-            BinForecast(
-                binId=device_id,
-                label=device_info(device_id).label,
-                status=result["status"],
-                predictedFullInHours=_round(hours),
-                predictedLowHours=_round(result.get("hours_low")),
-                predictedHighHours=_round(result.get("hours_high")),
-                riskLevel=_risk_level(hours),
-                fillPerVisitPct=_round(result.get("fill_per_visit_pct"), 3),
-                visitsPerHour=_round(result.get("visits_per_hour"), 1),
-                predictedFullAt=_clock_time(last_reading_at, hours),
-                earliestFullAt=_clock_time(last_reading_at, hours_low),
-                # Uses the earliest plausible time, not the median: a
-                # truck that's early costs little, a late one is an overflow.
-                collectSoon=hours_low is not None and hours_low <= lead_hours,
-                lastReadingAt=last_reading_at,
+            BinSeries(
+                **row.model_dump(),
+                thresholdPct=threshold,
+                history=[HistoryPoint(ts=p["ts"], fillPct=p["fill_pct"]) for p in points],
             )
         )
     return out
+
+
+@app.get("/dashboard", include_in_schema=False)
+@app.get("/", include_in_schema=False)
+def dashboard() -> FileResponse:
+    """The live forecast chart page. Open it directly, or embed it in the
+    main dashboard with an iframe."""
+    return FileResponse(Path(__file__).resolve().parent / "dashboard.html", media_type="text/html")
 
 
 @app.get("/forecast/placement", response_model=PlacementEstimate)

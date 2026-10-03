@@ -14,6 +14,9 @@ Everything is in this folder. No existing file in the repo is changed.
 | `model.py` | The regression (fit, forecast, placement). Pure functions |
 | `data.py` | Reads stored readings from the backend's SQLite file, read-only |
 | `service.py` | A small FastAPI app that serves the results on its own port |
+| `dashboard.html` | A live forecast chart page, served by `service.py` at `/dashboard` |
+| `demo.py` | Runs the model on made-up readings, with no backend needed |
+| `seed_demo.py` | Fills a separate demo database with made-up readings, to test the service and chart page on their own |
 | `requirements.txt` | `numpy` and `scikit-learn` |
 
 ## Run it
@@ -25,7 +28,51 @@ pip install -r backend/requirements.txt -r backend/app/machine_learning/requirem
 python -m uvicorn app.machine_learning.service:app --app-dir backend --port 8001
 ```
 
-Then open http://localhost:8001/forecast.
+Then open http://localhost:8001/dashboard for the live chart page, or
+http://localhost:8001/forecast for the raw data.
+
+## Testing without the backend or sensors
+
+`seed_demo.py` writes made-up readings for the three bins into
+`backend/demo.sqlite3` (never the real database) and keeps adding one
+every 10 seconds. Run it in one window:
+
+```powershell
+.\.venv\Scripts\python.exe backend\app\machine_learning\seed_demo.py
+```
+
+and start the service in another, pointed at the demo database:
+
+```powershell
+$env:DB_PATH = "$PWD\backend\demo.sqlite3"
+.\.venv\Scripts\python.exe -m uvicorn app.machine_learning.service:app --app-dir backend --port 8001
+```
+
+Open http://localhost:8001/dashboard and choose "15 minutes". Close that
+window (or run `Remove-Item Env:DB_PATH`) to go back to the real
+database.
+
+## The chart page
+
+`/dashboard` shows one panel per bin, most urgent first: a "Collect by"
+time, the measured fill level, and the forecast line to the collection
+threshold with its 80% range. It refreshes every 5 seconds and has a
+"Flag bins due within" control for the alert lead time.
+
+It reads `GET /forecast/series`, which returns each bin's forecast row
+plus its fill history (`history`), the threshold (`thresholdPct`) and
+`latestFullAt`.
+
+To show it inside the main dashboard without rebuilding it in React,
+embed it:
+
+```html
+<iframe src="http://<host>:8001/dashboard?theme=light&leadHours=2"
+        style="width:100%;height:900px;border:0"></iframe>
+```
+
+`theme` is `light` or `dark`. `leadHours` presets the alert lead time.
+The page copies its colours from `frontend/app/globals.css`.
 
 ## The model
 
