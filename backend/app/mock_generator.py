@@ -3,9 +3,10 @@ DEVICE_REGISTRY and feeds them through the exact same path a real
 firmware POST would use (app/telemetry.record_reading). This is a
 bridge, not a permanent feature: it lets the backend go live on the city
 broker — and start earning uptime score — before firmware is ready.
-Turn it off (MOCK_TELEMETRY_ENABLED=false) once real firmware is posting
-to /api/devices/{id}/readings for the same device IDs, or the two will
-interleave.
+It stands down per device automatically while real firmware is posting
+for that device (see telemetry.has_live_hardware), so bins without
+hardware keep looking alive on the city board. MOCK_TELEMETRY_ENABLED=false
+turns it off entirely.
 
 Assumes a bin depth of ~60cm for the synthesized distance_cm — purely for
 a plausible demo number, not a real calibration.
@@ -117,9 +118,14 @@ def _run(interval_s: int) -> None:
     logger.info("mock telemetry generator started (%ss interval, %d devices)", interval_s, len(DEVICE_REGISTRY))
     while not _stop_event.is_set():
         for device_id in DEVICE_REGISTRY:
+            # Real firmware posting for this bin? Then it owns the bin —
+            # no env flag to flip, the mock just stands down until the
+            # hardware goes quiet again.
+            if telemetry.has_live_hardware(device_id, within_s=interval_s * 3):
+                continue
             try:
                 metrics = _tick(device_id, interval_s)
-                telemetry.record_reading(device_id, metrics)
+                telemetry.record_reading(device_id, metrics, source="mock")
             except Exception:
                 logger.exception("mock tick failed for %s", device_id)
         _stop_event.wait(interval_s)

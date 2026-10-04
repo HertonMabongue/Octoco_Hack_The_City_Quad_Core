@@ -61,6 +61,8 @@ export interface ReportResult {
   wasteLabel?: string | null;
   confidence?: number | null;
   message?: string | null;
+  // Shown only once, at submission; lets the author withdraw the report.
+  withdrawToken?: string | null;
 }
 
 // A stored community report, for the municipal dashboard's incident log

@@ -29,7 +29,7 @@ export default function SidebarNav({ onNavigate }: { onNavigate?: () => void }) 
         <span className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-primary-foreground">
           <Recycle className="h-4 w-4" />
         </span>
-        Clean Corridor
+        Streetwise
       </Link>
 
       <span className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">

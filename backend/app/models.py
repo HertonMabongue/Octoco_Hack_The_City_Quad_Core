@@ -62,6 +62,9 @@ class ReportResult(CamelModel):
     waste_label: str | None = Field(default=None, alias="wasteLabel")
     confidence: float | None = None
     message: str | None = None
+    # Returned once, at submission. The only way for the (anonymous) author
+    # to withdraw the report later; the server keeps just a hash of it.
+    withdraw_token: str | None = Field(default=None, alias="withdrawToken")
 
 
 class Report(CamelModel):

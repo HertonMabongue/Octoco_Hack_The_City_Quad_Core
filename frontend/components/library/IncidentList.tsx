@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { API_URL } from "@/lib/constants";
 import { resolveReport } from "@/lib/api";
+import TunnelImage from "./TunnelImage";
 import { cn } from "@/lib/utils";
 import type { ReportRecord } from "@/lib/types";
 
@@ -42,18 +43,19 @@ export default function IncidentList({ reports: initial }: { reports: ReportReco
             report.resolved ? "before:bg-status-good" : "before:bg-status-warning"
           )}
         >
-          {report.photoUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={`${API_URL}${report.photoUrl}`}
-              alt="Reported littered area"
-              className="h-20 w-20 shrink-0 rounded-md border border-border object-cover"
-            />
-          ) : (
-            <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-md bg-secondary text-muted-foreground">
-              <MapPin className="h-5 w-5" />
-            </div>
-          )}
+          <TunnelImage
+            src={report.photoUrl ? `${API_URL}${report.photoUrl}` : ""}
+            alt="Reported littered area"
+            className="h-20 w-20 shrink-0 rounded-md border border-border object-cover"
+            fallback={
+              <div
+                className="flex h-20 w-20 shrink-0 items-center justify-center rounded-md bg-secondary text-muted-foreground"
+                title={report.photoUrl ? "Photo deleted under the retention policy" : undefined}
+              >
+                <MapPin className="h-5 w-5" />
+              </div>
+            }
+          />
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-sm font-medium">{report.note || "Community report: littered area"}</p>

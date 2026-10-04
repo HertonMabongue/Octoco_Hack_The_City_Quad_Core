@@ -37,7 +37,8 @@ ConnectionState = Literal["connecting", "connected", "failed", "disconnected"]
 
 _clients: dict[str, mqtt.Client] = {}
 _state: dict[str, ConnectionState] = {}
-_lock = threading.Lock()
+# Reentrant: _get_client holds it while calling _set_state, which takes it too.
+_lock = threading.RLock()
 
 
 def _topic(team_id: str, device_id: str, channel: str) -> str:
@@ -132,7 +133,13 @@ def publish_telemetry(device_id: str, metrics: dict[str, object]) -> None:
         # fallback is the difference between "offline on the city board"
         # and actually showing up.
         logger.warning("MQTT not connected for %s, using HTTP fallback", device_id)
-        _http_fallback_telemetry(device_id, metrics, settings)
+        # Off the caller's thread: the city host can be unreachable (we're
+        # off the venue network) and the fallback's 5 s timeout would
+        # otherwise hold up the firmware's own POST, which gives up at 5 s
+        # too and would report a failure for a reading we did accept.
+        threading.Thread(
+            target=_http_fallback_telemetry, args=(device_id, metrics, settings), daemon=True
+        ).start()
 
 
 def publish_status(device_id: str, status_value: Literal["online", "offline"], mode: DeviceMode) -> None:

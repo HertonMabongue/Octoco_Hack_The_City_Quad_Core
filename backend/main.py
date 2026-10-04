@@ -12,12 +12,11 @@ from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 
-from app import city_client, db, mock_generator, watchdog
+from app import city_client, db, mock_generator, retention, watchdog
 from app.config import get_settings
 from app.machine_learning import classifier
-from app.routers import alerts, bins, forecast, hotspots, ingest, reports
+from app.routers import alerts, bins, forecast, hotspots, ingest, privacy, reports
 
 # Without this, our own logger.info()/logger.warning() calls across the
 # app are silently dropped — Python's root logger defaults to WARNING
@@ -32,11 +31,13 @@ async def lifespan(_app: FastAPI):
     db.init_db()
     mock_generator.start(settings)
     watchdog.start(settings)
+    retention.start(settings)
     # Loading the photo model can take minutes the first time (it downloads),
     # so do it now in the background instead of during a resident's upload.
     if classifier.installed():
         threading.Thread(target=classifier.available, daemon=True).start()
     yield
+    retention.stop()
     watchdog.stop()
     mock_generator.stop()
     city_client.shutdown()
@@ -47,14 +48,15 @@ app = FastAPI(title="Adam Tas Corridor — Waste & Recycling API", lifespan=life
 settings = get_settings()
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_origins,
-    allow_credentials=True,
-    allow_methods=["*"],
+    allow_origins=settings.cors_origin_list,
+    allow_origin_regex=settings.cors_origin_regex,
+    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 
+# Uploaded photos are not served as a static directory: each is reachable
+# only through GET /api/reports/{id}/photo and is deleted by app/retention.py.
 Path(settings.upload_dir).mkdir(parents=True, exist_ok=True)
-app.mount("/uploads", StaticFiles(directory=settings.upload_dir), name="uploads")
 
 app.include_router(bins.router)
 app.include_router(alerts.router)
@@ -62,6 +64,7 @@ app.include_router(reports.router)
 app.include_router(ingest.router)
 app.include_router(forecast.router)
 app.include_router(hotspots.router)
+app.include_router(privacy.router)
 
 
 @app.get("/health", tags=["meta"])

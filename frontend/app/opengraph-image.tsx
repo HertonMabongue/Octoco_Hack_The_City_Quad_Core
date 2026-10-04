@@ -1,7 +1,7 @@
 import { ImageResponse } from "next/og";
 
 export const runtime = "edge";
-export const alt = "Clean Corridor — Waste Management System";
+export const alt = "Streetwise — Waste Management System";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -36,7 +36,7 @@ export default async function OpengraphImage() {
         </span>
       </div>
       <div style={{ fontSize: 68, fontWeight: 700, lineHeight: 1.1, display: "flex" }}>
-        Clean Corridor
+        Streetwise
       </div>
       <div
         style={{ fontSize: 32, color: "#c7d6cb", marginTop: 20, display: "flex", maxWidth: 860 }}

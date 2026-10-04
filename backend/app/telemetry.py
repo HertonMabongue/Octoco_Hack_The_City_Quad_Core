@@ -7,6 +7,8 @@ path can't drift apart.
 from __future__ import annotations
 
 import logging
+import threading
+import time
 from datetime import datetime, timezone
 from typing import Any
 
@@ -16,6 +18,33 @@ from app.config import Settings, get_settings
 logger = logging.getLogger("telemetry")
 
 REQUIRED_METRICS = ("uptime_s", "fill_pct")
+
+# When real firmware last posted for each device (monotonic seconds). The
+# mock generator consults this so it steps aside the moment real hardware
+# shows up for a device, instead of interleaving fake and real readings.
+_last_real_post: dict[str, float] = {}
+_real_lock = threading.Lock()
+
+
+def has_live_hardware(device_id: str, within_s: float) -> bool:
+    with _real_lock:
+        seen = _last_real_post.get(device_id)
+    return seen is not None and time.monotonic() - seen <= within_s
+
+
+def derive_mode(*, hazard: bool, tamper: bool, fill: str, requested: str | None) -> str:
+    """Priority: gas hazard > technician's maintenance switch > tamper or
+    critical fill > normal. Maintenance deliberately outranks tamper and
+    overflow (a technician lifting the lid and emptying the bin trips both)
+    but never a gas hazard, which stays an emergency whoever is standing
+    there. The firmware mirrors this for its own LED/OLED."""
+    if hazard:
+        return "emergency"
+    if requested == "maintenance":
+        return "maintenance"
+    if tamper or fill == "critical":
+        return "emergency"
+    return "normal"
 
 
 def fill_status(fill_pct: float, settings: Settings) -> str:
@@ -56,35 +85,39 @@ def select_city_metrics(device_id: str, metrics: dict[str, Any]) -> dict[str, fl
     }
 
 
-def record_reading(device_id: str, metrics: dict[str, Any]) -> None:
+def record_reading(device_id: str, metrics: dict[str, Any], source: str = "device") -> None:
     settings = get_settings()
     missing = [field for field in REQUIRED_METRICS if field not in metrics]
     if missing:
         raise ValueError(f"missing required metrics: {', '.join(missing)}")
+
+    if source == "device":
+        with _real_lock:
+            _last_real_post[device_id] = time.monotonic()
 
     db.insert_reading(device_id, metrics)
 
     fill = fill_status(float(metrics["fill_pct"]), settings)
     hazard = gas_alert(metrics.get("gas_raw"), settings)
     tamper = bool(metrics.get("movement_alert"))
+    in_maintenance = metrics.get("mode") == "maintenance"
 
-    if fill == "critical" and not db.recent_alert_exists(device_id, "overflow"):
+    # A bin in maintenance is being serviced on purpose, so the lid moving
+    # or the bin being emptied isn't news; a gas hazard always is.
+    if fill == "critical" and not in_maintenance and not db.recent_alert_exists(device_id, "overflow"):
         db.insert_alert(
             device_id, "overflow", f"Bin {device_id} is {metrics['fill_pct']:.0f}% full — needs collection"
         )
     if hazard and not db.recent_alert_exists(device_id, "hazard"):
         db.insert_alert(device_id, "hazard", f"Bin {device_id} gas reading at {metrics['gas_raw']} — possible hazard")
-    if tamper and not db.recent_alert_exists(device_id, "tamper"):
+    if tamper and not in_maintenance and not db.recent_alert_exists(device_id, "tamper"):
         db.insert_alert(device_id, "tamper", f"Bin {device_id} unusual movement detected — possible tamper/theft")
 
-    # Mode priority mirrors the firmware's own OLED priority order (see the
-    # file header comment in OctocoEsp32Project.ino): gas > movement > bin
-    # full > normal. Keeping the two in sync means a bin's physical display
-    # and its dashboard/city state never disagree about what's most urgent.
-    if hazard or tamper or fill == "critical":
-        new_mode = "emergency"
-    else:
-        new_mode = "normal"
+    # Mode priority mirrors the firmware's own OLED/LED priority order (see
+    # the file header comment in OctocoEsp32Project.ino) so a bin's physical
+    # display and its dashboard/city state never disagree about what's most
+    # urgent.
+    new_mode = derive_mode(hazard=hazard, tamper=tamper, fill=fill, requested=metrics.get("mode"))
 
     prev_connection, prev_mode = db.get_device_status(device_id)
 

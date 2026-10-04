@@ -23,8 +23,8 @@ const DESCRIPTION =
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: "Clean Corridor · Waste Management System",
-    template: "%s · Clean Corridor",
+    default: "Streetwise · Waste Management System",
+    template: "%s · Streetwise",
   },
   description: DESCRIPTION,
   keywords: [
@@ -39,15 +39,15 @@ export const metadata: Metadata = {
   ],
   openGraph: {
     type: "website",
-    siteName: "Clean Corridor",
-    title: "Clean Corridor · Waste Management System",
+    siteName: "Streetwise",
+    title: "Streetwise · Waste Management System",
     description: DESCRIPTION,
     url: SITE_URL,
     locale: "en_ZA",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Clean Corridor · Waste Management System",
+    title: "Streetwise · Waste Management System",
     description: DESCRIPTION,
   },
   robots: {

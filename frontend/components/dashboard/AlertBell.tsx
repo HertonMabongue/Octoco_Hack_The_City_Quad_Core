@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Bell } from "lucide-react";
 
-import { API_URL } from "@/lib/constants";
+import { API_HEADERS, API_URL } from "@/lib/constants";
 import type { Alert } from "@/lib/types";
 
 const POLL_MS = 30_000;
@@ -21,7 +21,7 @@ export default function AlertBell() {
 
     async function poll() {
       try {
-        const res = await fetch(`${API_URL}/api/alerts`, { cache: "no-store" });
+        const res = await fetch(`${API_URL}/api/alerts`, { cache: "no-store", headers: API_HEADERS });
         if (!res.ok) throw new Error(String(res.status));
         const alerts = (await res.json()) as Alert[];
         if (!cancelled) setCount(alerts.length);

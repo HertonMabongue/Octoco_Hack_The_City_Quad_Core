@@ -39,13 +39,26 @@ export function fillStatus(fillPct: number): BinStatus {
 export const GAS_ALERT_RAW = 800;
 export const TRAFFIC_HIGH_COUNT = 5;
 
-// Where the FastAPI backend lives. Set per machine in .env.local —
-// never hardcode an IP here, it'll be wrong the moment anyone changes wifi.
-export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+// Where the FastAPI backend lives — the ngrok URL when live. Comes from
+// PUBLIC_API_URL in the repo-root .env (see next.config.js); never hardcode
+// an address here, it'll be wrong the moment the tunnel restarts.
+export const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000").replace(
+  /\/+$/,
+  ""
+);
+
+// ngrok's free tier answers browser-like requests with an HTML "visit site"
+// interstitial unless this header is present — without it every fetch gets
+// that page instead of JSON. Harmless against a non-ngrok backend.
+export const API_HEADERS: Record<string, string> = { "ngrok-skip-browser-warning": "1" };
+
+// How long to wait on the backend before falling back to mock data, so a
+// dead tunnel degrades the page instead of hanging it.
+export const API_TIMEOUT_MS = 6000;
 
 // Canonical deployed URL, used for metadataBase / OpenGraph / sitemap.
 // Override with NEXT_PUBLIC_SITE_URL if the Vercel domain changes.
-export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://kleanclorridor.vercel.app";
+export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://streetwise-app.vercel.app";
 
 // Default map center: roughly the Adam Tas Corridor, Stellenbosch.
 export const DEFAULT_MAP_CENTER: [number, number] = [-33.9346, 18.8653];

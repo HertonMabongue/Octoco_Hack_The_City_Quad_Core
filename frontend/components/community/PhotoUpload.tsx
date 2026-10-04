@@ -22,6 +22,9 @@ export default function PhotoUpload({ onSelect }: { onSelect: (file: File) => vo
       <Label htmlFor="photo" className="mb-1.5 block">
         Photo of the littered area
       </Label>
+      <p className="mb-2 text-xs text-muted-foreground">
+        Frame the litter, not people: avoid faces and number plates.
+      </p>
       <label
         htmlFor="photo"
         className="flex cursor-pointer items-center gap-2 rounded-md border border-dashed border-input px-3 py-2 text-sm text-muted-foreground hover:border-primary hover:text-foreground"

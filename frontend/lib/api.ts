@@ -1,4 +1,4 @@
-import { API_URL, FILL_THRESHOLDS } from "./constants";
+import { API_HEADERS, API_TIMEOUT_MS, API_URL, FILL_THRESHOLDS } from "./constants";
 import type {
   Alert,
   Bin,
@@ -125,7 +125,12 @@ const MOCK_REPORTS: ReportRecord[] = [
 
 async function safeFetch<T>(path: string, options?: RequestInit): Promise<T | null> {
   try {
-    const res = await fetch(`${API_URL}${path}`, { cache: "no-store", ...options });
+    const res = await fetch(`${API_URL}${path}`, {
+      cache: "no-store",
+      signal: AbortSignal.timeout(API_TIMEOUT_MS),
+      ...options,
+      headers: { ...API_HEADERS, ...options?.headers },
+    });
     if (!res.ok) throw new Error(`Request failed: ${res.status}`);
     return (await res.json()) as T;
   } catch (err) {
@@ -223,8 +228,11 @@ export async function getHotspots(): Promise<HotspotsResponse> {
 export async function submitReport({ lat, lng, note, photo }: ReportInput): Promise<ReportResult> {
   // Only send what exists: the backend rejects an empty-string lat/lng
   // (it isn't a number), which is what a resident who hasn't shared a
-  // location would otherwise send.
+  // location would otherwise send. `consent` is only ever true here: the
+  // form won't submit without the box ticked, and the backend refuses
+  // reports without it.
   const formData = new FormData();
+  formData.append("consent", "true");
   if (lat != null) formData.append("lat", String(lat));
   if (lng != null) formData.append("lng", String(lng));
   if (note?.trim()) formData.append("note", note.trim());
@@ -232,7 +240,11 @@ export async function submitReport({ lat, lng, note, photo }: ReportInput): Prom
 
   let res: Response;
   try {
-    res = await fetch(`${API_URL}/api/reports`, { method: "POST", body: formData });
+    res = await fetch(`${API_URL}/api/reports`, {
+      method: "POST",
+      body: formData,
+      headers: API_HEADERS,
+    });
   } catch (err) {
     // Backend unreachable: keep the standalone-frontend behaviour.
     console.warn("[api] falling back to mock data for /api/reports:", err);
@@ -242,4 +254,18 @@ export async function submitReport({ lat, lng, note, photo }: ReportInput): Prom
   // form, not look like a successful submission.
   if (!res.ok) throw new Error(`Report failed: ${res.status}`);
   return (await res.json()) as ReportResult;
+}
+
+// Lets the resident who sent a report delete it (and its photo) again, using
+// the one-time token the backend returned at submission.
+export async function withdrawReport(id: string, token: string): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_URL}/api/reports/${id}`, {
+      method: "DELETE",
+      headers: { ...API_HEADERS, "X-Withdraw-Token": token },
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
 }

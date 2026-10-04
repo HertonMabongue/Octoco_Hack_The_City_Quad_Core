@@ -9,7 +9,7 @@ export default function Footer() {
       <div className="container flex flex-col gap-4 py-8 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-2">
           <Recycle className="h-4 w-4 shrink-0 text-primary" />
-          <span>&copy; {year} Clean Corridor. Built for Hack the City, Team Quad-Core.</span>
+          <span>&copy; {year} Streetwise. Built for Hack the City, Team Quad-Core.</span>
         </div>
 
         <nav className="flex flex-wrap gap-x-6 gap-y-2">
@@ -21,6 +21,9 @@ export default function Footer() {
           </Link>
           <Link href="/community/report" className="transition-colors hover:text-foreground">
             Report littering
+          </Link>
+          <Link href="/privacy" className="transition-colors hover:text-foreground">
+            Privacy
           </Link>
         </nav>
       </div>

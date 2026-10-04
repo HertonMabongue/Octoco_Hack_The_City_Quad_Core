@@ -10,7 +10,7 @@
 // file avoids Node-only APIs (no Buffer) and sticks to atob/btoa +
 // TextEncoder/TextDecoder, which both runtimes provide.
 
-export const SESSION_COOKIE = "cc_session";
+export const SESSION_COOKIE = "sw_session";
 
 export interface MockSession {
   username: string;
@@ -50,8 +50,8 @@ export function decodeSession(value: string | undefined | null): MockSession | n
   }
 }
 
-// Demo defaults so judges can log in without digging through .env.local.
-// Override MUNICIPAL_USERNAME / MUNICIPAL_PASSWORD in frontend/.env.local
+// Demo defaults so judges can log in without digging through .env.
+// Override MUNICIPAL_USERNAME / MUNICIPAL_PASSWORD in the repo-root .env
 // for anything other than the hackathon demo.
 export const DEFAULT_MUNICIPAL_USERNAME = "operator";
 export const DEFAULT_MUNICIPAL_PASSWORD = "corridor2026";

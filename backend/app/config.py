@@ -66,7 +66,39 @@ class Settings(BaseSettings):
     # one per 30s) is too short a window to see a trend in it.
     forecast_history_points: int = 240
 
-    cors_origins: list[str] = ["*"]
+    # Browser origins allowed to call this API (comma-separated). The Vercel
+    # frontend's own server-side calls aren't browsers, so CORS only matters
+    # for the browser-direct calls: bins on the community page and photo
+    # report uploads. The regex also admits Vercel preview deployments.
+    cors_origins: str = "https://streetwise-app.vercel.app,http://localhost:3000"
+    cors_origin_regex: str = r"https://streetwise-app(-[a-z0-9-]+)?\.vercel\.app"
+
+    # Data retention (see app/retention.py and docs/DATA_PROTECTION.md).
+    # A resident's photo is only needed until the municipality has dealt
+    # with the report, so it is deleted shortly after resolution, with a
+    # hard cap for reports nobody ever resolves. The report row itself
+    # (rounded location, waste type, timestamps — no photo, no note) is
+    # kept longer as anonymous analytics, then deleted too.
+    photo_retention_resolved_hours: int = 24
+    photo_retention_open_days: int = 30
+    report_retention_days: int = 365
+    readings_retention_days: int = 90
+    alert_retention_days: int = 365
+    retention_sweep_minutes: int = 60
+
+    # Public report endpoint abuse limit, per client IP, held in memory only
+    # (never written to disk or the database).
+    report_rate_limit: int = 5
+    report_rate_window_s: int = 600
+
+    # Reported coordinates are rounded to this many decimal places (4 ≈ 11 m):
+    # precise enough to cluster litter hotspots, too coarse to pinpoint a
+    # reporter's home.
+    coord_decimals: int = 4
+
+    @property
+    def cors_origin_list(self) -> list[str]:
+        return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
 
     # Mock telemetry — generates plausible readings for every device in
     # DEVICE_REGISTRY and feeds them through the same path a real firmware

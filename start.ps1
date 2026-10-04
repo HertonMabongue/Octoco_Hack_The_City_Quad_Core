@@ -50,11 +50,7 @@ if (-not (Test-Path "frontend/node_modules")) {
 
 if ((-not (Test-Path ".env")) -and (Test-Path ".env.example")) {
   Copy-Item ".env.example" ".env"
-  Write-Host "==> Created .env from .env.example. Edit it if you're off the venue network."
-}
-
-if ((-not (Test-Path "frontend/.env.local")) -and (Test-Path "frontend/.env.local.example")) {
-  Copy-Item "frontend/.env.local.example" "frontend/.env.local"
+  Write-Host "==> Created .env from .env.example. Fill in WIFI_* and PUBLIC_API_URL before flashing the firmware."
 }
 
 if (Test-Path ".env") {
@@ -68,7 +64,7 @@ if (Test-Path ".env") {
 Write-Host "==> Starting backend on :8000 and frontend on :3000"
 
 $backend = Start-Process -FilePath $VenvPython `
-  -ArgumentList "-m", "uvicorn", "main:app", "--reload", "--app-dir", "backend", "--port", "8000" `
+  -ArgumentList "-m", "uvicorn", "main:app", "--reload", "--app-dir", "backend", "--host", "0.0.0.0", "--port", "8000" `
   -NoNewWindow -PassThru
 
 $frontend = Start-Process -FilePath "npm" `

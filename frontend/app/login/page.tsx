@@ -6,7 +6,7 @@ import LoginForm from "@/components/auth/LoginForm";
 
 export const metadata: Metadata = {
   title: "Municipal login",
-  description: "Sign in to the Clean Corridor municipal dashboard.",
+  description: "Sign in to the Streetwise municipal dashboard.",
   robots: { index: false, follow: false },
 };
 
@@ -24,7 +24,7 @@ export default function LoginPage({
           </span>
           <div>
             <div className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-              Clean Corridor
+              Streetwise
             </div>
             <h1 className="font-display text-lg font-semibold leading-tight">Municipal access</h1>
           </div>

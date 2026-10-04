@@ -117,6 +117,14 @@ def init_db() -> None:
         for column, sql_type in (("waste_type", "TEXT"), ("waste_confidence", "REAL")):
             if column not in existing_report_columns:
                 con.execute(f"ALTER TABLE reports ADD COLUMN {column} {sql_type}")
+        # Privacy columns: when a report was closed (starts the photo
+        # retention clock), and a hash of the one-time token that lets an
+        # anonymous reporter withdraw their own report. Only the hash is
+        # stored, so a database leak can't be used to delete reports.
+        for column, sql_type in (("resolved_at", "TEXT"), ("withdraw_token_hash", "TEXT")):
+            if column not in existing_report_columns:
+                con.execute(f"ALTER TABLE reports ADD COLUMN {column} {sql_type}")
+        con.execute("CREATE INDEX IF NOT EXISTS idx_readings_ts ON readings(ts)")
 
         con.commit()
 
@@ -334,15 +342,18 @@ def insert_report(
     photo_path: str | None,
     waste_type: str | None = None,
     waste_confidence: float | None = None,
+    withdraw_token_hash: str | None = None,
 ) -> str:
     report_id = str(uuid.uuid4())
     with get_connection() as con:
         con.execute(
             """
-            INSERT INTO reports(id, lat, lng, note, photo_path, created_at, waste_type, waste_confidence)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO reports(
+              id, lat, lng, note, photo_path, created_at, waste_type, waste_confidence, withdraw_token_hash
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            (report_id, lat, lng, note, photo_path, utc_now(), waste_type, waste_confidence),
+            (report_id, lat, lng, note, photo_path, utc_now(), waste_type, waste_confidence, withdraw_token_hash),
         )
         con.commit()
     return report_id
@@ -384,6 +395,100 @@ def list_reports(limit: int, include_resolved: bool = True) -> list[dict[str, An
 def resolve_report(report_id: str) -> bool:
     """Marks a report resolved. Returns False if no such report exists."""
     with get_connection() as con:
-        cursor = con.execute("UPDATE reports SET resolved = 1 WHERE id = ?", (report_id,))
+        cursor = con.execute(
+            "UPDATE reports SET resolved = 1, resolved_at = COALESCE(resolved_at, ?) WHERE id = ?",
+            (utc_now(), report_id),
+        )
         con.commit()
         return cursor.rowcount > 0
+
+
+def get_report(report_id: str) -> dict[str, Any] | None:
+    with get_connection() as con:
+        row = con.execute(
+            "SELECT id, lat, lng, note, photo_path, created_at, resolved, waste_type, waste_confidence, "
+            "withdraw_token_hash FROM reports WHERE id = ?",
+            (report_id,),
+        ).fetchone()
+    if row is None:
+        return None
+    return {
+        "id": row[0],
+        "lat": row[1],
+        "lng": row[2],
+        "note": row[3],
+        "photo_path": row[4],
+        "created_at": row[5],
+        "resolved": bool(row[6]),
+        "waste_type": row[7],
+        "waste_confidence": row[8],
+        "withdraw_token_hash": row[9],
+    }
+
+
+def delete_report(report_id: str) -> bool:
+    with get_connection() as con:
+        cursor = con.execute("DELETE FROM reports WHERE id = ?", (report_id,))
+        con.commit()
+        return cursor.rowcount > 0
+
+
+# ---- Retention (driven by app/retention.py) -------------------------------
+
+def reports_with_expired_photos(resolved_before: str, open_before: str) -> list[dict[str, Any]]:
+    """Reports still holding a photo that has outlived its purpose: resolved
+    ones past the resolved cutoff (a report resolved before `resolved_at`
+    was tracked falls back to its creation time), and unresolved ones past
+    the hard cap."""
+    with get_connection() as con:
+        rows = con.execute(
+            """
+            SELECT id, photo_path, resolved FROM reports
+            WHERE photo_path IS NOT NULL AND (
+              (resolved = 1 AND COALESCE(resolved_at, created_at) < ?)
+              OR (resolved = 0 AND created_at < ?)
+            )
+            """,
+            (resolved_before, open_before),
+        ).fetchall()
+    return [{"id": r[0], "photo_path": r[1], "resolved": bool(r[2])} for r in rows]
+
+
+def clear_report_media(report_id: str, scrub_note: bool) -> None:
+    """Detach the photo from a report; for a resolved one also drop the
+    free-text note, which is the other place a resident might have typed
+    something identifying. The row stays as anonymous analytics."""
+    with get_connection() as con:
+        if scrub_note:
+            con.execute("UPDATE reports SET photo_path = NULL, note = NULL WHERE id = ?", (report_id,))
+        else:
+            con.execute("UPDATE reports SET photo_path = NULL WHERE id = ?", (report_id,))
+        con.commit()
+
+
+def referenced_photo_names() -> set[str]:
+    with get_connection() as con:
+        rows = con.execute("SELECT photo_path FROM reports WHERE photo_path IS NOT NULL").fetchall()
+    return {Path(r[0]).name for r in rows}
+
+
+def delete_reports_before(cutoff: str) -> int:
+    with get_connection() as con:
+        cursor = con.execute("DELETE FROM reports WHERE created_at < ?", (cutoff,))
+        con.commit()
+        return cursor.rowcount
+
+
+def delete_readings_before(cutoff: str) -> int:
+    with get_connection() as con:
+        cursor = con.execute("DELETE FROM readings WHERE ts < ?", (cutoff,))
+        con.commit()
+        return cursor.rowcount
+
+
+def delete_alerts_before(cutoff: str) -> int:
+    """Only resolved alerts: an open alert is still live operational state."""
+    with get_connection() as con:
+        cursor = con.execute("DELETE FROM alerts WHERE resolved = 1 AND created_at < ?", (cutoff,))
+        con.commit()
+        return cursor.rowcount

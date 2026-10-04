@@ -52,11 +52,7 @@ fi
 
 if [ ! -f ".env" ] && [ -f ".env.example" ]; then
   cp .env.example .env
-  echo "==> Created .env from .env.example. Edit it if you're off the venue network."
-fi
-
-if [ ! -f "frontend/.env.local" ] && [ -f "frontend/.env.local.example" ]; then
-  cp frontend/.env.local.example frontend/.env.local
+  echo "==> Created .env from .env.example. Fill in WIFI_* and PUBLIC_API_URL before flashing the firmware."
 fi
 
 set -a
@@ -69,7 +65,9 @@ echo "==> Starting backend on :8000 and frontend on :3000"
 # through the venv's own interpreter regardless of whether the venv's
 # script shims are on PATH, which is the part that differs most between
 # platforms.
-"$VENV_BIN/python" -m uvicorn main:app --reload --app-dir backend --port 8000 &
+# --host 0.0.0.0 so the ESP32 can reach the backend over the LAN when not
+# going through ngrok (ngrok itself only needs localhost).
+"$VENV_BIN/python" -m uvicorn main:app --reload --app-dir backend --host 0.0.0.0 --port 8000 &
 BACKEND_PID=$!
 
 (cd frontend && npm run dev) &
