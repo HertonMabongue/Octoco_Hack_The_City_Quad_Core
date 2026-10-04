@@ -4,11 +4,16 @@ import type { NextRequest } from "next/server";
 import { getAlerts, getBins, getForecast, getHotspots } from "@/lib/api";
 import { SESSION_COOKIE, decodeSession } from "@/lib/auth";
 
-// Dusty: the dashboard's AI assistant. This route is the only place the
-// Gemini API key is used, so it never reaches the browser. Each question
-// is sent to Gemini together with a fresh snapshot of the dashboard's
-// own data (bins, forecasts, alerts, hotspots), and the model is told to
-// answer from that snapshot only.
+// Dusty: the site's AI assistant. This route is the only place the Gemini
+// API key is used, so it never reaches the browser. Each question is sent
+// to Gemini together with a fresh snapshot of the site's own data, and
+// the model is told to answer from that snapshot.
+//
+// Two audiences, decided here on the server (never trusted from the
+// browser alone):
+//   operator  signed in to the dashboard: bins, forecasts, alerts, hotspots
+//   resident  everyone else (home page, community app): public bin
+//             status and recycling guidance only, no operational data
 //
 // Set GEMINI_API_KEY in frontend/.env.local (and in Vercel's environment
 // variables for the hosted site). GEMINI_MODEL is optional.
@@ -22,6 +27,26 @@ const MAX_CHARS = 800; // per message
 const HOUR_MS = 60 * 60 * 1000;
 
 type ChatMessage = { role: "user" | "dusty"; text: string };
+type Audience = "operator" | "resident";
+
+// A small brake on the public endpoint so one visitor can't burn through
+// the Gemini quota. Kept in memory, so it is per server instance: enough
+// for a demo, not a substitute for real rate limiting.
+const WINDOW_MS = 5 * 60 * 1000;
+const LIMITS: Record<Audience, number> = { operator: 60, resident: 15 };
+const recentRequests = new Map<string, number[]>();
+
+function allow(key: string, limit: number): boolean {
+  const now = Date.now();
+  const recent = (recentRequests.get(key) ?? []).filter((t) => now - t < WINDOW_MS);
+  if (recent.length >= limit) {
+    recentRequests.set(key, recent);
+    return false;
+  }
+  recent.push(now);
+  recentRequests.set(key, recent);
+  return true;
+}
 
 function clock(ms: number): string {
   return new Date(ms).toLocaleTimeString("en-ZA", {
@@ -32,7 +57,18 @@ function clock(ms: number): string {
   });
 }
 
-// The facts Dusty is allowed to use, as compact JSON.
+// What a resident may ask about: public bin status only. No alerts,
+// sensor readings, forecasts or hotspot recommendations.
+async function residentSnapshot() {
+  const bins = await getBins();
+  return {
+    timeNow: clock(Date.now()),
+    bins: bins.map((b) => ({ name: b.label, fillPct: Math.round(b.fillPct), status: b.status })),
+    howToReportLitter: "Use the Report page of the community app (/community/report): add a photo and a location.",
+  };
+}
+
+// The facts Dusty is allowed to use for the waste team, as compact JSON.
 async function snapshot() {
   const [bins, forecast, alerts, hotspots] = await Promise.all([
     getBins(),
@@ -83,7 +119,7 @@ async function snapshot() {
 
 function systemPrompt(data: unknown): string {
   return [
-    "You are Dusty, the assistant on Clean Corridor, a dashboard the municipal waste team uses to monitor smart bins in Stellenbosch's Adam Tas Corridor.",
+    "You are Dusty, the assistant on Streetwise, a dashboard the municipal waste team uses to monitor smart bins in Stellenbosch's Adam Tas Corridor.",
     "Answer using only the DATA below. If the DATA does not contain the answer, say you don't have that information. Never invent bins, numbers, times or locations.",
     "Keep answers short: one to four sentences, or a short list. Plain text only, no markdown.",
     "Times are in South African time (24-hour). 'collectBy' is the early end of the forecast range and is the time to schedule collection by. A forecast status of not_enough_data or not_filling means there is no forecast for that bin yet.",
@@ -95,13 +131,22 @@ function systemPrompt(data: unknown): string {
   ].join("\n");
 }
 
-export async function POST(request: NextRequest) {
-  // Same mock session the dashboard uses, so this isn't an open proxy to
-  // the Gemini API for anyone who finds the URL.
-  if (!decodeSession(request.cookies.get(SESSION_COOKIE)?.value)) {
-    return NextResponse.json({ error: "Sign in to the dashboard to use Dusty." }, { status: 401 });
-  }
+function residentPrompt(data: unknown): string {
+  return [
+    "You are Dusty, the friendly assistant on Streetwise, a waste and recycling site for residents of Stellenbosch's Adam Tas Corridor.",
+    "You help with three things: which public bins have space (from the DATA below), how to report litter or dumping, and general guidance on what can be recycled.",
+    "For bin questions use only the DATA. Never invent bins, fill levels or locations. A bin with status 'critical' is full or nearly full.",
+    "For recycling questions give short, general guidance, and say that local rules can differ, so the municipality's own guidance takes priority.",
+    "Keep answers short: one to four sentences, or a short list. Plain text only, no markdown. Times are South African time (24-hour).",
+    "You have no information about alerts, sensors, collection schedules or municipal operations. If asked, say that is only available to the waste team.",
+    "If asked something unrelated to waste, bins, recycling or reporting litter, say that is outside what you can help with.",
+    "",
+    "DATA:",
+    JSON.stringify(data),
+  ].join("\n");
+}
 
+export async function POST(request: NextRequest) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     return NextResponse.json(
@@ -110,7 +155,23 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const body = (await request.json().catch(() => null)) as { messages?: unknown } | null;
+  const body = (await request.json().catch(() => null)) as {
+    messages?: unknown;
+    audience?: unknown;
+  } | null;
+
+  // Operator mode needs both the dashboard asking for it and a valid
+  // dashboard session. Anything else gets the resident view.
+  const signedIn = Boolean(decodeSession(request.cookies.get(SESSION_COOKIE)?.value));
+  const audience: Audience = body?.audience === "operator" && signedIn ? "operator" : "resident";
+
+  const visitor = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "local";
+  if (!allow(`${audience}:${visitor}`, LIMITS[audience])) {
+    return NextResponse.json(
+      { error: "Dusty needs a short break. Try again in a few minutes." },
+      { status: 429 }
+    );
+  }
   const messages: ChatMessage[] = Array.isArray(body?.messages)
     ? (body.messages as ChatMessage[])
         .filter(
@@ -136,7 +197,16 @@ export async function POST(request: NextRequest) {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
       body: JSON.stringify({
-        system_instruction: { parts: [{ text: systemPrompt(await snapshot()) }] },
+        system_instruction: {
+          parts: [
+            {
+              text:
+                audience === "operator"
+                  ? systemPrompt(await snapshot())
+                  : residentPrompt(await residentSnapshot()),
+            },
+          ],
+        },
         contents: messages.map((m) => ({
           role: m.role === "user" ? "user" : "model",
           parts: [{ text: m.text }],

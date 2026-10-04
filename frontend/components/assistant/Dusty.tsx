@@ -1,17 +1,33 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 import { Send, X } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
 type ChatMessage = { role: "user" | "dusty"; text: string };
 
-const STARTERS = [
-  "Which bin should be collected first?",
-  "Are there any open alerts?",
-  "Where should we add a bin?",
-];
+type Audience = "operator" | "resident";
+
+// What Dusty offers depends on where he is: the waste team's dashboard,
+// or the public home page and community app.
+const COPY: Record<Audience, { subtitle: string; intro: string; starters: string[] }> = {
+  operator: {
+    subtitle: "Ask about bins, collections and hotspots",
+    intro: "I answer from this dashboard's live data. Try one of these:",
+    starters: [
+      "Which bin should be collected first?",
+      "Are there any open alerts?",
+      "Where should we add a bin?",
+    ],
+  },
+  resident: {
+    subtitle: "Ask about bins, recycling and reporting litter",
+    intro: "I can help you find a bin, recycle right or report litter. Try one of these:",
+    starters: ["Which bin has space right now?", "Can I recycle a pizza box?", "How do I report litter?"],
+  },
+};
 
 // Dusty's broom. Drawn inline so it takes the button's text colour.
 function Broom({ className }: { className?: string }) {
@@ -30,12 +46,17 @@ function Broom({ className }: { className?: string }) {
   );
 }
 
-// Dusty: the dashboard's AI assistant. A broom button fixed to the
-// bottom-right of every dashboard page; it sweeps when clicked and opens
-// a small chat panel. Questions go to /api/dusty, which holds the Gemini
-// API key and adds the dashboard's live data, so the key never reaches
-// the browser.
+// Dusty: the site's AI assistant. A broom button fixed to the
+// bottom-right of every page (mounted once in app/layout.tsx); it sweeps
+// when clicked and opens a small chat panel. On the dashboard he helps
+// the waste team; everywhere else he helps residents. Questions go to
+// /api/dusty, which holds the Gemini API key and decides what data each
+// audience may see, so neither the key nor operator data reaches a
+// resident's browser.
 export default function Dusty() {
+  const pathname = usePathname();
+  const audience: Audience = pathname.startsWith("/dashboard") ? "operator" : "resident";
+  const copy = COPY[audience];
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState("");
@@ -72,6 +93,13 @@ export default function Dusty() {
     if (open) input.current?.focus();
   }, [open]);
 
+  // Start a fresh conversation when moving between the dashboard and the
+  // public pages, so operator answers never linger on a public page.
+  useEffect(() => {
+    setMessages([]);
+    setError(null);
+  }, [audience]);
+
   useEffect(() => {
     log.current?.scrollTo({ top: log.current.scrollHeight });
   }, [messages, busy]);
@@ -97,7 +125,7 @@ export default function Dusty() {
       const res = await fetch("/api/dusty", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: next }),
+        body: JSON.stringify({ messages: next, audience }),
       });
       const data = (await res.json().catch(() => null)) as { reply?: string; error?: string } | null;
       if (res.ok && data?.reply) {
@@ -117,13 +145,13 @@ export default function Dusty() {
       {open && (
         <section
           role="dialog"
-          aria-label="Dusty, the dashboard assistant"
+          aria-label="Dusty, the Streetwise assistant"
           className="flex h-[28rem] max-h-[70vh] w-[22rem] max-w-[calc(100vw-2.5rem)] flex-col overflow-hidden rounded-xl border border-border/60 bg-card shadow-card"
         >
           <header className="flex items-center justify-between border-b border-border/60 px-4 py-3">
             <div>
               <h2 className="font-display text-sm font-semibold">Dusty</h2>
-              <p className="text-xs text-muted-foreground">Ask about bins, collections and hotspots</p>
+              <p className="text-xs text-muted-foreground">{copy.subtitle}</p>
             </div>
             <button
               type="button"
@@ -138,10 +166,8 @@ export default function Dusty() {
           <div ref={log} aria-live="polite" className="flex-1 space-y-3 overflow-y-auto px-4 py-3 text-sm">
             {messages.length === 0 && (
               <div className="space-y-2">
-                <p className="text-muted-foreground">
-                  I answer from this dashboard&apos;s live data. Try one of these:
-                </p>
-                {STARTERS.map((starter) => (
+                <p className="text-muted-foreground">{copy.intro}</p>
+                {copy.starters.map((starter) => (
                   <button
                     key={starter}
                     type="button"
