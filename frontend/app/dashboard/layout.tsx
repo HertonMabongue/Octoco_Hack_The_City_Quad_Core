@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
 
+import Dusty from "@/components/assistant/Dusty";
 import DashboardTopbar from "@/components/layout/DashboardTopbar";
 import Footer from "@/components/layout/Footer";
 import MobileNav from "@/components/layout/MobileNav";
@@ -34,6 +35,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </div>
       </div>
       <Footer />
+      <Dusty />
     </div>
   );
 }
