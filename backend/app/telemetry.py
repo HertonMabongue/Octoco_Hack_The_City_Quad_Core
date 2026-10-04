@@ -14,6 +14,7 @@ from typing import Any
 
 from app import city_client, db
 from app.config import Settings, get_settings
+from app.machine_learning import model
 
 logger = logging.getLogger("telemetry")
 
@@ -59,29 +60,67 @@ def gas_alert(gas_raw: int | None, settings: Settings) -> bool:
     return gas_raw is not None and gas_raw >= settings.gas_alert_raw
 
 
-def select_city_metrics(device_id: str, metrics: dict[str, Any]) -> dict[str, float]:
-    """The city protocol wants exactly uptime_s + 3 numeric metrics,
-    prioritized by impact. Four independent sensors can report in any
-    given reading (see firmware/src/OctocoEsp32Project.ino), so this picks
-    the three that matter most rather than forwarding whatever happened to
-    arrive: fill level (the core overflow problem), the gas reading
-    (safety hazard — highest-impact when present), then traffic (useful
-    collection-planning signal). Movement/tamper is deliberately NOT one
-    of the three — it already drives `mode` below, which is the channel
-    the brief gives for exactly this kind of state change, and it isn't
-    numeric in any meaningful unit.
+# How far ahead "no collection needed" is reported as. The city wants a
+# number, and a bin that isn't filling (or has no history yet) has no
+# honest ETA, so it reads as the cap: "a week or more".
+MAX_HOURS_TO_FULL = 168.0
+SMOOTHING_READINGS = 5
 
-    Booleans never go in this dict — the brief requires numeric-only
-    values, and overflow_flag/movement_alert are both booleans. A missing
-    optional sensor is reported as 0, not omitted, so the city always sees
-    the same 3 keys from this device regardless of which subsystems
-    reported this tick.
+
+def smoothed_fill(device_id: str, fallback: float) -> float:
+    """Mean of the last few readings (~2.5 min at one per 30 s): one noisy
+    echo can't swing what the city sees."""
+    recent = db.history(device_id, SMOOTHING_READINGS)
+    return sum(p["fill_pct"] for p in recent) / len(recent) if recent else fallback
+
+
+def hours_to_full(device_id: str, settings: Settings) -> float:
+    """Forecast hours until the bin reaches the collection threshold, from
+    the same Bayesian model the Insights page uses. 0 once it's there."""
+    result = model.predict(db.history(device_id, settings.forecast_history_points), settings.fill_critical_pct)
+    if result["status"] == "at_threshold":
+        return 0.0
+    if result["status"] == "ok" and result.get("hours") is not None:
+        return min(float(result["hours"]), MAX_HOURS_TO_FULL)
+    return MAX_HOURS_TO_FULL   # not_filling / not_enough_data
+
+
+def select_city_metrics(device_id: str, metrics: dict[str, Any]) -> dict[str, float]:
+    """What the city mainframe sees. The protocol wants uptime_s plus three
+    numeric metrics, prioritized by impact — and says nothing requires them
+    to be raw sensor values. Raw ADC counts and one-off ultrasonic echoes
+    mean little to a municipality, so the device posts raw readings to us
+    and we publish three derived ones instead:
+
+      fill_pct        how full the bin is (average of the last few readings)
+      hours_to_full_h when it will need collecting, from the forecast model:
+                      0 = needs collecting now, 168 = a week or more away
+                      (also the value when there isn't enough history yet)
+      open_alerts_n   unresolved alerts on this bin — overflow, gas hazard,
+                      tamper, offline. Folds the gas and movement sensors
+                      into one number the city can act on, without an
+                      uncalibrated ADC value it can't interpret.
+
+    The raw readings (gas_raw, people_count, ...) still reach our own
+    dashboard. Booleans never go in this dict — the brief requires
+    numeric-only values — and the same keys are always sent, so the city
+    board sees a stable shape whichever sensors reported this tick.
     """
+    settings = get_settings()
+    fill = float(metrics["fill_pct"])
+    try:
+        fill = smoothed_fill(device_id, fill)
+        eta = hours_to_full(device_id, settings)
+    except Exception:
+        # A modelling hiccup must never stop telemetry reaching the city.
+        logger.exception("could not derive city metrics for %s, sending defaults", device_id)
+        eta = MAX_HOURS_TO_FULL if fill < settings.fill_critical_pct else 0.0
+
     return {
         "uptime_s": int(metrics["uptime_s"]),
-        "fill_pct": round(float(metrics["fill_pct"]), 1),
-        "gas_raw": int(metrics.get("gas_raw") or 0),
-        "people_count": int(metrics.get("people_count") or 0),
+        "fill_pct": round(fill, 1),
+        "hours_to_full_h": round(eta, 1),
+        "open_alerts_n": db.count_open_alerts(device_id),
     }
 
 

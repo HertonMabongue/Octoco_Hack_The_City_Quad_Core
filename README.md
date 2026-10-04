@@ -45,11 +45,18 @@ frontend; Pydantic + typed FastAPI routers on the backend. The same
     "metrics": {
       "uptime_s": 128,
       "fill_pct": 64.0,
-      "distance_cm": 18.4,
-      "overflow_flag": 0
+      "hours_to_full_h": 5.2,
+      "open_alerts_n": 0
     }
   }
   ```
+  These are **derived**, not raw sensor values: the device posts raw
+  readings to the backend, and `select_city_metrics()` in
+  `backend/app/telemetry.py` publishes `fill_pct` (smoothed over the last
+  few readings), `hours_to_full_h` (forecast time until collection is
+  needed: 0 = now, 168 = a week or more) and `open_alerts_n` (unresolved
+  overflow / gas / tamper / offline alerts). Raw gas and footfall values stay
+  on our own dashboard.
 - **Status**, retained, `hack/{team}/{device}/status`:
   ```json
   { "status": "online", "mode": "normal" }
@@ -89,8 +96,10 @@ Backend, local frontend and firmware all read it.
 
 1. `cp .env.example .env`, then set `WIFI_SSID`, `WIFI_PASSWORD` (2.4 GHz
    network) and `DEVICE_SLUG`.
-2. `./start.sh`, then in another terminal `ngrok http 8000`. Prefer a static
-   domain so the URL never changes: `ngrok http --url=<your-domain> 8000`.
+2. `./start.sh`, then in another terminal run ngrok against **`127.0.0.1`**
+   (not plain `8000`/`localhost` — ngrok tries IPv6 first, the backend only
+   listens on IPv4, and you get `ERR_NGROK_8012`). A static domain keeps the
+   URL fixed: `ngrok http --url=<your-domain> 127.0.0.1:8000`.
 3. Put the https URL in `.env` as **`PUBLIC_API_URL`** — the only line that
    changes per tunnel. The firmware and the frontend both read it.
 4. Vercel: add the same `PUBLIC_API_URL` under Project → Settings →

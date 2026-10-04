@@ -275,6 +275,13 @@ def insert_alert(device_id: str, alert_type: str, message: str) -> None:
         con.commit()
 
 
+def count_open_alerts(device_id: str) -> int:
+    with get_connection() as con:
+        return con.execute(
+            "SELECT COUNT(*) FROM alerts WHERE device_id = ? AND resolved = 0", (device_id,)
+        ).fetchone()[0]
+
+
 def recent_alert_exists(device_id: str, alert_type: str, within_seconds: int = 900) -> bool:
     cutoff = time.time() - within_seconds
     with get_connection() as con:
