@@ -275,10 +275,14 @@ def insert_alert(device_id: str, alert_type: str, message: str) -> None:
         con.commit()
 
 
-def count_open_alerts(device_id: str) -> int:
+def count_alerts_since(device_id: str, alert_types: tuple[str, ...], since_iso: str) -> int:
+    """Alerts of the given types raised for a device since a timestamp,
+    resolved or not (an incident that was handled still happened)."""
+    marks = ",".join("?" * len(alert_types))
     with get_connection() as con:
         return con.execute(
-            "SELECT COUNT(*) FROM alerts WHERE device_id = ? AND resolved = 0", (device_id,)
+            f"SELECT COUNT(*) FROM alerts WHERE device_id = ? AND type IN ({marks}) AND created_at >= ?",
+            (device_id, *alert_types, since_iso),
         ).fetchone()[0]
 
 

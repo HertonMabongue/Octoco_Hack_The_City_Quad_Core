@@ -44,19 +44,20 @@ frontend; Pydantic + typed FastAPI routers on the backend. The same
   {
     "metrics": {
       "uptime_s": 128,
-      "fill_pct": 64.0,
+      "collection_priority_pct": 68.0,
       "hours_to_full_h": 5.2,
-      "open_alerts_n": 0
+      "safety_incidents_24h_n": 0
     }
   }
   ```
   These are **derived**, not raw sensor values: the device posts raw
-  readings to the backend, and `select_city_metrics()` in
-  `backend/app/telemetry.py` publishes `fill_pct` (smoothed over the last
-  few readings), `hours_to_full_h` (forecast time until collection is
-  needed: 0 = now, 168 = a week or more) and `open_alerts_n` (unresolved
-  overflow / gas / tamper / offline alerts). Raw gas and footfall values stay
-  on our own dashboard.
+  readings to the backend (for our own dashboard, alerts and forecast), and
+  `select_city_metrics()` in `backend/app/telemetry.py` publishes
+  `collection_priority_pct` (how urgently a truck is needed: the worse of
+  smoothed fill and forecast time pressure), `hours_to_full_h` (forecast
+  time until collection is needed: 0 = now, 168 = a week or more) and
+  `safety_incidents_24h_n` (gas hazards + tamper events in the last 24 h).
+  Instant emergencies also reach the city through the retained status `mode`.
 - **Status**, retained, `hack/{team}/{device}/status`:
   ```json
   { "status": "online", "mode": "normal" }

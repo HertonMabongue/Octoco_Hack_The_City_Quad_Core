@@ -115,8 +115,13 @@ def _http_fallback_telemetry(device_id: str, metrics: dict[str, object], setting
     try:
         with urllib.request.urlopen(request, timeout=5) as response:
             logger.info("telemetry sent via HTTP fallback (%s): %s", device_id, response.status)
-    except urllib.error.URLError:
-        logger.exception("HTTP fallback telemetry also failed for %s", device_id)
+    except (urllib.error.URLError, TimeoutError, OSError) as exc:
+        # One line, not a traceback: off the venue network this fires for
+        # every device every 30 s, and the cause is always "city unreachable".
+        logger.warning(
+            "HTTP fallback telemetry also failed for %s (%s:%s unreachable: %s)",
+            device_id, settings.city_http_host, settings.city_http_port, getattr(exc, "reason", exc),
+        )
 
 
 def publish_telemetry(device_id: str, metrics: dict[str, object]) -> None:

@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 import threading
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from app import city_client, db
@@ -85,26 +85,44 @@ def hours_to_full(device_id: str, settings: Settings) -> float:
     return MAX_HOURS_TO_FULL   # not_filling / not_enough_data
 
 
+# Collection priority: the worse of "how full" and "how soon". A bin forecast
+# to hit the threshold within this many hours starts to outrank its raw fill.
+PRIORITY_HORIZON_H = 24.0
+SAFETY_ALERT_TYPES = ("hazard", "tamper")
+SAFETY_WINDOW_H = 24
+
+
+def collection_priority(fill_pct: float, eta_hours: float) -> float:
+    """0–100: how urgently a truck is needed. Takes the worse of the bin's
+    fill level and the time pressure from the forecast (0% with a day or
+    more to spare, rising linearly to 100% when it's due now). A bin at
+    40% that is filling fast can therefore outrank one sitting at 60%."""
+    time_pressure = 100.0 * max(0.0, 1.0 - eta_hours / PRIORITY_HORIZON_H)
+    return max(fill_pct, time_pressure)
+
+
 def select_city_metrics(device_id: str, metrics: dict[str, Any]) -> dict[str, float]:
     """What the city mainframe sees. The protocol wants uptime_s plus three
-    numeric metrics, prioritized by impact — and says nothing requires them
-    to be raw sensor values. Raw ADC counts and one-off ultrasonic echoes
-    mean little to a municipality, so the device posts raw readings to us
-    and we publish three derived ones instead:
+    numeric metrics, prioritized by impact — and nothing requires them to
+    be raw sensor values. A single ultrasonic echo or an uncalibrated gas
+    ADC count means little to a municipality, so the device posts raw
+    readings to us (they power our own dashboard, alerts and forecast) and
+    we publish three derived, decision-oriented metrics instead:
 
-      fill_pct        how full the bin is (average of the last few readings)
-      hours_to_full_h when it will need collecting, from the forecast model:
-                      0 = needs collecting now, 168 = a week or more away
-                      (also the value when there isn't enough history yet)
-      open_alerts_n   unresolved alerts on this bin — overflow, gas hazard,
-                      tamper, offline. Folds the gas and movement sensors
-                      into one number the city can act on, without an
-                      uncalibrated ADC value it can't interpret.
+      collection_priority_pct  how urgently the bin needs collecting (0–100):
+                               worse of smoothed fill and forecast time
+                               pressure — see collection_priority()
+      hours_to_full_h          when, from the forecast model: 0 = due now,
+                               168 = a week or more (also when there isn't
+                               enough history yet)
+      safety_incidents_24h_n   gas hazards + tamper events on this bin in the
+                               last 24 h — the gas and movement sensors as a
+                               count of incidents, not an ADC value
 
-    The raw readings (gas_raw, people_count, ...) still reach our own
-    dashboard. Booleans never go in this dict — the brief requires
-    numeric-only values — and the same keys are always sent, so the city
-    board sees a stable shape whichever sensors reported this tick.
+    No boolean goes in this dict (the brief requires numeric-only values),
+    and the same keys are always sent so the city board sees a stable shape
+    whichever sensors reported this tick. Instantaneous emergencies still
+    reach the city through the retained status `mode`.
     """
     settings = get_settings()
     fill = float(metrics["fill_pct"])
@@ -116,11 +134,12 @@ def select_city_metrics(device_id: str, metrics: dict[str, Any]) -> dict[str, fl
         logger.exception("could not derive city metrics for %s, sending defaults", device_id)
         eta = MAX_HOURS_TO_FULL if fill < settings.fill_critical_pct else 0.0
 
+    since = (datetime.now(timezone.utc) - timedelta(hours=SAFETY_WINDOW_H)).isoformat()
     return {
         "uptime_s": int(metrics["uptime_s"]),
-        "fill_pct": round(fill, 1),
+        "collection_priority_pct": round(min(collection_priority(fill, eta), 100.0), 1),
         "hours_to_full_h": round(eta, 1),
-        "open_alerts_n": db.count_open_alerts(device_id),
+        "safety_incidents_24h_n": db.count_alerts_since(device_id, SAFETY_ALERT_TYPES, since),
     }
 
 
