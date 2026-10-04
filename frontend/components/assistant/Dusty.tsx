@@ -56,6 +56,9 @@ function Broom({ className }: { className?: string }) {
 export default function Dusty() {
   const pathname = usePathname();
   const audience: Audience = pathname.startsWith("/dashboard") ? "operator" : "resident";
+  // Bottom-left on the home page (its bottom-right corner is taken by the
+  // device mock-up); bottom-right everywhere else.
+  const onLeft = pathname === "/";
   const copy = COPY[audience];
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -63,25 +66,40 @@ export default function Dusty() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const broom = useRef<HTMLSpanElement>(null);
+  const dust = useRef<(HTMLSpanElement | null)[]>([]);
   const input = useRef<HTMLInputElement>(null);
   const log = useRef<HTMLDivElement>(null);
 
-  // The sweep: a few quick swings, pivoting near the top of the handle.
-  // Skipped for anyone who has asked their device for reduced motion.
+  // The sweep: several wide swings, pivoting near the top of the handle,
+  // with a few specks of dust kicked up from the bristles. Skipped for
+  // anyone who has asked their device for reduced motion.
   function sweep() {
     const el = broom.current;
     if (!el || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     el.animate(
       [
-        { transform: "rotate(0deg)" },
-        { transform: "rotate(-24deg)" },
-        { transform: "rotate(16deg)" },
-        { transform: "rotate(-16deg)" },
-        { transform: "rotate(10deg)" },
-        { transform: "rotate(0deg)" },
+        { transform: "rotate(0deg) translateX(0)" },
+        { transform: "rotate(-34deg) translateX(-3px)" },
+        { transform: "rotate(26deg) translateX(3px)" },
+        { transform: "rotate(-30deg) translateX(-3px)" },
+        { transform: "rotate(22deg) translateX(2px)" },
+        { transform: "rotate(-24deg) translateX(-2px)" },
+        { transform: "rotate(14deg) translateX(1px)" },
+        { transform: "rotate(-8deg) translateX(0)" },
+        { transform: "rotate(0deg) translateX(0)" },
       ],
-      { duration: 700, easing: "ease-in-out" }
+      { duration: 1500, easing: "ease-in-out" }
     );
+    dust.current.forEach((speck, i) => {
+      speck?.animate(
+        [
+          { opacity: 0, transform: "translate(0, 0) scale(0.6)" },
+          { opacity: 0.9, offset: 0.25 },
+          { opacity: 0, transform: `translate(${-10 - i * 5}px, ${-8 - i * 4}px) scale(1.4)` },
+        ],
+        { duration: 700, delay: 150 + i * 330, easing: "ease-out" }
+      );
+    });
   }
 
   function toggle() {
@@ -141,7 +159,12 @@ export default function Dusty() {
   }
 
   return (
-    <div className="fixed bottom-5 right-5 z-50 flex flex-col items-end gap-3">
+    <div
+      className={cn(
+        "fixed bottom-5 z-50 flex flex-col gap-3",
+        onLeft ? "left-5 items-start" : "right-5 items-end"
+      )}
+    >
       {open && (
         <section
           role="dialog"
@@ -232,11 +255,21 @@ export default function Dusty() {
         onClick={toggle}
         aria-expanded={open}
         aria-label={open ? "Close Dusty, the assistant" : "Ask Dusty, the assistant"}
-        className="flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-card transition-transform hover:scale-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+        className="relative flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-card transition-transform hover:scale-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
       >
         <span ref={broom} className="block h-8 w-8" style={{ transformOrigin: "74% 12%" }}>
           <Broom className="h-8 w-8" />
         </span>
+        {[0, 1, 2].map((i) => (
+          <span
+            key={i}
+            ref={(el) => {
+              dust.current[i] = el;
+            }}
+            aria-hidden="true"
+            className="pointer-events-none absolute bottom-3 left-3 h-1.5 w-1.5 rounded-full bg-primary-foreground opacity-0"
+          />
+        ))}
       </button>
     </div>
   );
