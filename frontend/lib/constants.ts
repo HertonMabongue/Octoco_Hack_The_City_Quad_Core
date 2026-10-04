@@ -42,7 +42,7 @@ export const TRAFFIC_HIGH_COUNT = 5;
 // Where the FastAPI backend lives — the ngrok URL when live. Comes from
 // PUBLIC_API_URL in the repo-root .env (see next.config.js); never hardcode
 // an address here, it'll be wrong the moment the tunnel restarts.
-export const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000").replace(
+export const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000").replace(
   /\/+$/,
   ""
 );

@@ -109,6 +109,13 @@ class Settings(BaseSettings):
     mock_telemetry_enabled: bool = True
     mock_interval_s: int = 30
 
+    # Seed made-up littering reports (labelled "[simulated]" on the map) at
+    # startup if none exist yet, so the hotspot map has clusters to show
+    # before residents have sent any. Remove them with
+    # `python -m app.machine_learning.seed_reports --clear`, and set this
+    # false so they aren't re-added.
+    seed_demo_reports: bool = True
+
     # If a device hasn't posted a reading in this long, we stop telling the
     # city it's online (publishes a retained offline status) — otherwise a
     # dead device/mock looks perpetually "online" on the city dashboard.

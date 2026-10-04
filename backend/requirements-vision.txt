@@ -1,3 +1,10 @@
+# Optional photo classifier (machine_learning/classifier.py).
+#
+# transformers is pinned below 4.50 on purpose: transformers 5.x needs
+# PyTorch >= 2.5, but 2.2.2 is the LAST PyTorch release for Intel Macs
+# (x86_64 macOS), so there is nothing newer to upgrade to there. 4.44–4.49
+# work with torch 2.2.2 and with newer torch alike. numpy is pinned <2 in
+# requirements.txt for the same reason (torch 2.2.2 is built against numpy 1.x).
 torch
-transformers
+transformers>=4.44,<4.50
 pillow

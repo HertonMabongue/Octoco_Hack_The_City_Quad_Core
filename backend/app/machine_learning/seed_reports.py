@@ -8,6 +8,9 @@ Run from backend/:
 
 They go in the real reports table with a note starting "[simulated]"
 (the map labels them as simulated), so --clear removes only these.
+
+The backend also runs seed_if_empty() at startup (SEED_DEMO_REPORTS=true,
+the default), so the map is populated without running anything by hand.
 Bin readings need no seeding: the mock generator already feeds the
 database (see app/mock_generator.py).
 """
@@ -62,6 +65,17 @@ def seed() -> int:
             )
         con.commit()
     return len(rows)
+
+
+def seed_if_empty() -> int:
+    """Seed once: does nothing if simulated reports already exist (even if
+    they have since been resolved), so restarts don't pile on more. Real
+    reports are left alone either way. Returns how many were added."""
+    with db.get_connection() as con:
+        existing = con.execute(
+            "SELECT COUNT(*) FROM reports WHERE note LIKE ?", (f"{SIMULATED_NOTE_PREFIX}%",)
+        ).fetchone()[0]
+    return 0 if existing else seed()
 
 
 if __name__ == "__main__":

@@ -15,7 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app import city_client, db, mock_generator, retention, watchdog
 from app.config import get_settings
-from app.machine_learning import classifier
+from app.machine_learning import classifier, seed_reports
 from app.routers import alerts, bins, forecast, hotspots, ingest, privacy, reports
 
 # Without this, our own logger.info()/logger.warning() calls across the
@@ -29,6 +29,10 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name
 async def lifespan(_app: FastAPI):
     settings = get_settings()
     db.init_db()
+    if settings.seed_demo_reports:
+        added = seed_reports.seed_if_empty()
+        if added:
+            logging.getLogger("seed").info("seeded %d simulated littering reports", added)
     mock_generator.start(settings)
     watchdog.start(settings)
     retention.start(settings)

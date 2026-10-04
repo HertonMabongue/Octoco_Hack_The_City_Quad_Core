@@ -15,6 +15,7 @@ def client(tmp_path, monkeypatch):
     monkeypatch.setenv("DB_PATH", str(tmp_path / "test.sqlite3"))
     monkeypatch.setenv("UPLOAD_DIR", str(tmp_path / "uploads"))
     monkeypatch.setenv("MOCK_TELEMETRY_ENABLED", "false")
+    monkeypatch.setenv("SEED_DEMO_REPORTS", "false")
 
     from app import city_client, retention, telemetry
     from app.config import get_settings
