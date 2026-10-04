@@ -143,6 +143,28 @@ def select_city_metrics(device_id: str, metrics: dict[str, Any]) -> dict[str, fl
     }
 
 
+def _log_reading(device_id: str, source: str, metrics: dict[str, Any], mode: str, city: dict[str, float]) -> None:
+    """One line per reading, so the terminal shows what actually arrived and
+    what the city was sent. Real device readings log at INFO; the mock
+    generator's (3 bins every 30 s) at DEBUG so they don't bury them."""
+    moved = metrics.get("movement_alert")
+    dist = metrics.get("distance_cm")
+    logger.log(
+        logging.INFO if source == "device" else logging.DEBUG,
+        "READING %-6s [%s]  fill=%s%% dist=%s gas=%s people=%s movement=%s  mode_in=%s -> mode=%s  |  to city: %s",
+        device_id,
+        source,
+        f"{float(metrics['fill_pct']):.1f}",
+        f"{float(dist):.1f}cm" if dist is not None else "n/a",
+        metrics.get("gas_raw", "n/a"),
+        metrics.get("people_count", "n/a"),
+        "n/a" if moved is None else ("YES" if moved else "no"),
+        metrics.get("mode", "n/a"),
+        mode,
+        city,
+    )
+
+
 def record_reading(device_id: str, metrics: dict[str, Any], source: str = "device") -> None:
     settings = get_settings()
     missing = [field for field in REQUIRED_METRICS if field not in metrics]
@@ -166,10 +188,13 @@ def record_reading(device_id: str, metrics: dict[str, Any], source: str = "devic
         db.insert_alert(
             device_id, "overflow", f"Bin {device_id} is {metrics['fill_pct']:.0f}% full — needs collection"
         )
+        logger.warning("ALERT  %s  overflow", device_id)
     if hazard and not db.recent_alert_exists(device_id, "hazard"):
         db.insert_alert(device_id, "hazard", f"Bin {device_id} gas reading at {metrics['gas_raw']} — possible hazard")
+        logger.warning("ALERT  %s  hazard", device_id)
     if tamper and not in_maintenance and not db.recent_alert_exists(device_id, "tamper"):
         db.insert_alert(device_id, "tamper", f"Bin {device_id} unusual movement detected — possible tamper/theft")
+        logger.warning("ALERT  %s  tamper", device_id)
 
     # Mode priority mirrors the firmware's own OLED/LED priority order (see
     # the file header comment in OctocoEsp32Project.ino) so a bin's physical
@@ -180,7 +205,9 @@ def record_reading(device_id: str, metrics: dict[str, Any], source: str = "devic
     prev_connection, prev_mode = db.get_device_status(device_id)
 
     db.upsert_device_status(device_id, "online", new_mode)
-    city_client.publish_telemetry(device_id, select_city_metrics(device_id, metrics))
+    city_metrics = select_city_metrics(device_id, metrics)
+    city_client.publish_telemetry(device_id, city_metrics)
+    _log_reading(device_id, source, metrics, new_mode, city_metrics)
 
     # Status is retained on the city broker, so we only need to republish
     # it on a real change (initial handshake or a mode toggle) rather than

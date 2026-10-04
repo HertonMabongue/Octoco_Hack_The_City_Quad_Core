@@ -27,7 +27,7 @@ import threading
 from typing import Any
 
 from app import telemetry
-from app.config import DEVICE_REGISTRY, Settings
+from app.config import DEVICE_REGISTRY, Settings, get_settings
 
 logger = logging.getLogger("mock_generator")
 
@@ -117,7 +117,10 @@ def _tick(device_id: str, interval_s: int) -> dict[str, Any]:
 def _run(interval_s: int) -> None:
     logger.info("mock telemetry generator started (%ss interval, %d devices)", interval_s, len(DEVICE_REGISTRY))
     while not _stop_event.is_set():
+        real = get_settings().real_device_list
         for device_id in DEVICE_REGISTRY:
+            if device_id in real:   # REAL_DEVICES: silent hardware must read as offline, never as fake data
+                continue
             # Real firmware posting for this bin? Then it owns the bin —
             # no env flag to flip, the mock just stands down until the
             # hardware goes quiet again.

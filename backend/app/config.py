@@ -109,6 +109,15 @@ class Settings(BaseSettings):
     mock_telemetry_enabled: bool = True
     mock_interval_s: int = 30
 
+    # Devices with real hardware (comma-separated, e.g. "bin-01"). The mock
+    # NEVER generates readings for these, even while the hardware is silent:
+    # a dead real bin should show as offline, not as plausible fake data.
+    real_devices: str = ""
+
+    @property
+    def real_device_list(self) -> list[str]:
+        return [d.strip() for d in self.real_devices.split(",") if d.strip()]
+
     # Seed made-up littering reports (labelled "[simulated]" on the map) at
     # startup if none exist yet, so the hotspot map has clusters to show
     # before residents have sent any. Remove them with

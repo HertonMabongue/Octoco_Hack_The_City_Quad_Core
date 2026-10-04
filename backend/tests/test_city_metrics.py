@@ -64,3 +64,19 @@ def test_safety_incidents_count_gas_and_tamper_in_the_last_day_only(client):
         con.execute("UPDATE alerts SET created_at = ? WHERE type = 'tamper'", (old,))
         con.commit()
     assert telemetry.select_city_metrics("bin-01", {"uptime_s": 1, "fill_pct": 20.0})["safety_incidents_24h_n"] == 1
+
+
+def test_device_readings_are_logged_with_what_the_city_gets(client, caplog):
+    import logging
+
+    with caplog.at_level(logging.INFO, logger="telemetry"):
+        telemetry.record_reading(
+            "bin-01",
+            {"uptime_s": 5, "fill_pct": 64.0, "distance_cm": 6.3, "gas_raw": 210, "people_count": 3, "movement_alert": False},
+            source="device",
+        )
+        telemetry.record_reading("bin-02", {"uptime_s": 5, "fill_pct": 10.0}, source="mock")
+    lines = [r.getMessage() for r in caplog.records if r.name == "telemetry"]
+    assert len(lines) == 1, "mock readings must stay quiet"
+    assert "bin-01" in lines[0] and "fill=64.0%" in lines[0] and "gas=210" in lines[0]
+    assert "to city:" in lines[0] and "collection_priority_pct" in lines[0]
