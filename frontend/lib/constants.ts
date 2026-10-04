@@ -61,12 +61,6 @@ export const DEFAULT_MAP_CENTER: [number, number] = [-33.9346, 18.8653];
 export const FIXED_SCHEDULE_VISITS_PER_WEEK = 2;
 export const ASSUMED_COST_PER_TRIP_ZAR = 450;
 
-export const RISK_LABELS: Record<"low" | "medium" | "high", string> = {
-  low: "Low",
-  medium: "Medium",
-  high: "High",
-};
-
 // Static asset metadata for the Library's bin registry
 // (app/dashboard/library) — install date and sensor loadout aren't part
 // of the live telemetry contract (backend/app/models.py's Bin), so

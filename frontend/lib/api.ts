@@ -4,6 +4,7 @@ import type {
   Bin,
   BinHistoryPoint,
   ForecastPoint,
+  HotspotsResponse,
   ReportInput,
   ReportRecord,
   ReportResult,
@@ -176,30 +177,69 @@ export async function getForecast(): Promise<ForecastPoint[]> {
   const data = await safeFetch<ForecastPoint[]>("/api/forecast");
   if (data) return data;
 
-  // Mirrors the backend's own heuristic (routers/forecast.py) against
-  // MOCK_BINS, rather than a separate mock shape, so Insights looks the
-  // same whether or not the backend is reachable.
-  const ASSUMED_PCT_PER_HOUR = 3; // roughly matches mock_generator.py's random walk
+  // Offline stand-in shaped like the model's output, built from MOCK_BINS
+  // so Insights still renders without the backend: each bin gets a short
+  // history rising at an assumed rate, and the hours to the threshold
+  // follow from that same rate.
+  const ASSUMED_PCT_PER_HOUR = 6;
+  const STEP_MIN = 5;
   return MOCK_BINS.map((bin) => {
     const remaining = FILL_THRESHOLDS.critical - bin.fillPct;
     const hours = remaining > 0 ? Math.round((remaining / ASSUMED_PCT_PER_HOUR) * 10) / 10 : 0;
+    const history = Array.from({ length: 12 }, (_, i) => {
+      const minutesAgo = (11 - i) * STEP_MIN;
+      return {
+        ts: new Date(Date.now() - minutesAgo * 60 * 1000).toISOString(),
+        fillPct: Math.max(0, bin.fillPct - (ASSUMED_PCT_PER_HOUR * minutesAgo) / 60),
+      };
+    });
     return {
       binId: bin.id,
       label: bin.label,
+      status: remaining > 0 ? "ok" : "at_threshold",
       predictedFullInHours: hours,
-      riskLevel: hours <= 12 ? "high" : hours <= 48 ? "medium" : "low",
-      source: "heuristic",
+      predictedLowHours: Math.round(hours * 0.7 * 10) / 10,
+      predictedHighHours: Math.round(hours * 1.4 * 10) / 10,
+      fillPerVisitPct: null,
+      visitsPerHour: null,
+      lastReadingAt: history[history.length - 1]?.ts ?? null,
+      history,
     };
   });
 }
 
+export async function getHotspots(): Promise<HotspotsResponse> {
+  const data = await safeFetch<HotspotsResponse>("/api/hotspots");
+  return (
+    data ?? {
+      classifierInstalled: false,
+      summary: { reports: 0, hotspots: 0, addBin: 0, moreStaff: 0, cleanupCrew: 0 },
+      hotspots: [],
+      reports: [],
+    }
+  );
+}
+
 export async function submitReport({ lat, lng, note, photo }: ReportInput): Promise<ReportResult> {
+  // Only send what exists: the backend rejects an empty-string lat/lng
+  // (it isn't a number), which is what a resident who hasn't shared a
+  // location would otherwise send.
   const formData = new FormData();
-  formData.append("lat", lat?.toString() ?? "");
-  formData.append("lng", lng?.toString() ?? "");
-  formData.append("note", note ?? "");
+  if (lat != null) formData.append("lat", String(lat));
+  if (lng != null) formData.append("lng", String(lng));
+  if (note?.trim()) formData.append("note", note.trim());
   if (photo) formData.append("photo", photo);
 
-  const data = await safeFetch<ReportResult>("/api/reports", { method: "POST", body: formData });
-  return data ?? { id: `mock-${Date.now()}`, status: "queued" };
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}/api/reports`, { method: "POST", body: formData });
+  } catch (err) {
+    // Backend unreachable: keep the standalone-frontend behaviour.
+    console.warn("[api] falling back to mock data for /api/reports:", err);
+    return { id: `mock-${Date.now()}`, status: "queued" };
+  }
+  // A real error (unsupported photo, too large, bad field) must reach the
+  // form, not look like a successful submission.
+  if (!res.ok) throw new Error(`Report failed: ${res.status}`);
+  return (await res.json()) as ReportResult;
 }

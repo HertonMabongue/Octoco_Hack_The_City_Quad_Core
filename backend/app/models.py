@@ -53,8 +53,15 @@ class Alert(CamelModel):
 
 
 class ReportResult(CamelModel):
+    """Outcome of a community photo report. "rejected" means the photo
+    classifier found no waste in it, so nothing was stored."""
+
     id: str
-    status: Literal["queued", "received"]
+    status: Literal["queued", "received", "rejected"]
+    waste_type: str | None = Field(default=None, alias="wasteType")
+    waste_label: str | None = Field(default=None, alias="wasteLabel")
+    confidence: float | None = None
+    message: str | None = None
 
 
 class Report(CamelModel):
@@ -71,22 +78,87 @@ class Report(CamelModel):
     photo_url: str | None = Field(default=None, alias="photoUrl")
     created_at: str = Field(alias="createdAt")
     resolved: bool = False
+    waste_label: str | None = Field(default=None, alias="wasteLabel")
 
 
-RiskLevel = Literal["low", "medium", "high"]
-ForecastSource = Literal["heuristic", "model"]
+ForecastStatus = Literal["ok", "at_threshold", "not_filling", "not_enough_data"]
+HotspotAction = Literal["add_bin", "more_staff", "cleanup_crew"]
+
+
+class ForecastHistoryPoint(CamelModel):
+    ts: str
+    fill_pct: float = Field(alias="fillPct")
 
 
 class ForecastPoint(CamelModel):
-    """One bin's projected time to needing collection. `source` is
-    "heuristic" until app/forecasting/'s real model is trained (see its
-    README) — the frontend labels the two differently, but the shape
-    never changes, so swapping the implementation in routers/forecast.py
-    is the only change the handoff needs.
+    """One bin's time-to-collection forecast from machine_learning/model.py,
+    plus the readings it was made from so the dashboard can chart them.
+
+    The three `predicted*Hours` values are the model's median and 80%
+    range, counted from `lastReadingAt`. They are only set when `status`
+    is "ok" (or 0 for "at_threshold").
     """
 
     bin_id: str = Field(alias="binId")
     label: str
+    status: ForecastStatus
     predicted_full_in_hours: float | None = Field(default=None, alias="predictedFullInHours")
-    risk_level: RiskLevel = Field(alias="riskLevel")
-    source: ForecastSource = "heuristic"
+    predicted_low_hours: float | None = Field(default=None, alias="predictedLowHours")
+    predicted_high_hours: float | None = Field(default=None, alias="predictedHighHours")
+    fill_per_visit_pct: float | None = Field(default=None, alias="fillPerVisitPct")
+    visits_per_hour: float | None = Field(default=None, alias="visitsPerHour")
+    last_reading_at: str | None = Field(default=None, alias="lastReadingAt")
+    history: list[ForecastHistoryPoint]
+
+
+class PlacementEstimate(CamelModel):
+    """How fast a new bin would fill at a spot with a given footfall."""
+
+    status: Literal["ok", "not_filling", "not_enough_data"]
+    visits_per_hour: float = Field(alias="visitsPerHour")
+    fill_pct_per_hour: float | None = Field(default=None, alias="fillPctPerHour")
+    fill_per_visit_pct: float | None = Field(default=None, alias="fillPerVisitPct")
+    hours_to_threshold: float | None = Field(default=None, alias="hoursToThreshold")
+    hours_low: float | None = Field(default=None, alias="hoursLow")
+    hours_high: float | None = Field(default=None, alias="hoursHigh")
+
+
+class HotspotReport(CamelModel):
+    id: str
+    lat: float
+    lng: float
+    type: str
+    type_label: str = Field(alias="typeLabel")
+    confidence: float | None = None
+    created_at: str = Field(alias="createdAt")
+    hotspot: str | None = None
+    simulated: bool = False
+
+
+class Hotspot(CamelModel):
+    """A cluster of nearby littering reports and what the city should do."""
+
+    id: str
+    lat: float
+    lng: float
+    count: int
+    dominant_label: str = Field(alias="dominantLabel")
+    recyclable_share: float = Field(alias="recyclableShare")
+    action: HotspotAction
+    title: str
+    reason: str
+
+
+class HotspotSummary(CamelModel):
+    reports: int
+    hotspots: int
+    add_bin: int = Field(alias="addBin")
+    more_staff: int = Field(alias="moreStaff")
+    cleanup_crew: int = Field(alias="cleanupCrew")
+
+
+class HotspotsResponse(CamelModel):
+    classifier_installed: bool = Field(alias="classifierInstalled")
+    summary: HotspotSummary
+    hotspots: list[Hotspot]
+    reports: list[HotspotReport]

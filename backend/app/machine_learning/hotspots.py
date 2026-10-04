@@ -2,166 +2,54 @@
 
 Pipeline:
 
-    photo + location (community app)  ->  waste type (classifier.py)
-        ->  clusters of nearby reports (DBSCAN)  ->  what the city should do
+    photo + location (POST /api/reports)  ->  waste type (classifier.py,
+    stored on the report)  ->  clusters of nearby reports (DBSCAN)
+    ->  what the city should do
 
-Reads the reports the main backend already stores (read-only). Photo
-classifications are kept in a separate small database next to it, so the
-main database is never written to.
+Reads the unresolved reports with a location from the main database
+(app.db), so a report resolved on the Library page drops off the map.
 """
 from __future__ import annotations
 
 import math
-import sqlite3
-import uuid
 from collections import Counter
-from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any
 
 import numpy as np
 from sklearn.cluster import DBSCAN
 
-from app.config import DEVICE_REGISTRY, get_settings
+from app import db
+from app.config import DEVICE_REGISTRY
 from app.machine_learning import classifier
 
 EARTH_RADIUS_M = 6_371_000.0
 CLUSTER_RADIUS_M = 80.0      # reports this close together belong to one hotspot
 MIN_REPORTS = 3              # fewer than this is not a hotspot
 BIN_NEARBY_M = 150.0         # a bin within this distance "serves" a hotspot
-DUMPING_TYPES = {"rubble", "household", "garden"}
+MAX_REPORTS = 500
 
-TYPE_LABELS = {key: label for key, (_, label, _) in classifier.LABELS.items()}
-TYPE_LABELS.update(unclear="Unclear photo", unclassified="Not classified")
-
-
-def _labels_path() -> Path:
-    """Our own label store, beside the backend database it describes."""
-    db_path = Path(get_settings().db_path)
-    return db_path.with_name(f"ml_labels_{db_path.stem}.sqlite3")
+SIMULATED_NOTE_PREFIX = "[simulated]"   # see seed_reports.py
 
 
-def _labels_connection() -> sqlite3.Connection:
-    con = sqlite3.connect(_labels_path())
-    con.execute(
-        """
-        CREATE TABLE IF NOT EXISTS report_labels (
-          report_id TEXT PRIMARY KEY,
-          type TEXT NOT NULL,
-          confidence REAL,
-          source TEXT NOT NULL
-        )
-        """
-    )
-    # Reports uploaded through this layer's own map page. Only the waste
-    # type and location are kept: the photo itself is never stored.
-    con.execute(
-        """
-        CREATE TABLE IF NOT EXISTS ml_reports (
-          id TEXT PRIMARY KEY,
-          lat REAL NOT NULL,
-          lng REAL NOT NULL,
-          type TEXT NOT NULL,
-          confidence REAL,
-          created_at TEXT NOT NULL
-        )
-        """
-    )
-    return con
-
-
-def add_report(lat: float, lng: float, waste_type: str, confidence: float | None) -> str:
-    """Stores a report made through the map page. Returns its id."""
-    report_id = f"ml-{uuid.uuid4()}"
-    con = _labels_connection()
-    try:
-        con.execute(
-            "INSERT INTO ml_reports(id, lat, lng, type, confidence, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-            (report_id, lat, lng, waste_type, confidence, datetime.now(timezone.utc).isoformat()),
-        )
-        con.commit()
-    finally:
-        con.close()
-    return report_id
-
-
-def _read_own_reports() -> list[dict[str, Any]]:
-    con = _labels_connection()
-    try:
-        rows = con.execute(
-            "SELECT id, lat, lng, type, confidence, created_at FROM ml_reports ORDER BY created_at"
-        ).fetchall()
-    finally:
-        con.close()
-    return [
-        {"id": r[0], "lat": r[1], "lng": r[2], "note": None, "photo_path": None, "created_at": r[5],
-         "type": r[3], "type_label": TYPE_LABELS.get(r[3], r[3]), "confidence": r[4], "label_source": "upload"}
-        for r in rows
-    ]
-
-
-def save_label(report_id: str, waste_type: str, confidence: float | None, source: str) -> None:
-    con = _labels_connection()
-    try:
-        con.execute(
-            "INSERT OR REPLACE INTO report_labels(report_id, type, confidence, source) VALUES (?, ?, ?, ?)",
-            (report_id, waste_type, confidence, source),
-        )
-        con.commit()
-    finally:
-        con.close()
-
-
-def _load_labels() -> dict[str, tuple[str, float | None, str]]:
-    con = _labels_connection()
-    try:
-        rows = con.execute("SELECT report_id, type, confidence, source FROM report_labels").fetchall()
-    finally:
-        con.close()
-    return {r[0]: (r[1], r[2], r[3]) for r in rows}
-
-
-def _read_reports() -> list[dict[str, Any]]:
-    """Unresolved reports that have a location, straight from the backend
-    database (opened read-only)."""
-    try:
-        con = sqlite3.connect(f"file:{get_settings().db_path}?mode=ro", uri=True)
-    except sqlite3.OperationalError:
-        return []
-    try:
-        rows = con.execute(
-            """
-            SELECT id, lat, lng, note, photo_path, created_at FROM reports
-            WHERE resolved = 0 AND lat IS NOT NULL AND lng IS NOT NULL
-            ORDER BY created_at
-            """
-        ).fetchall()
-    except sqlite3.OperationalError:
-        return []
-    finally:
-        con.close()
-    return [
-        {"id": r[0], "lat": r[1], "lng": r[2], "note": r[3], "photo_path": r[4], "created_at": r[5]}
-        for r in rows
-    ]
-
-
-def labelled_reports(classify_new: bool = True) -> list[dict[str, Any]]:
-    """Reports with a waste type attached. Photos that haven't been
-    classified yet are classified now (if the model is available) and the
-    result is remembered, so each photo is only processed once."""
-    reports = _read_reports()
-    labels = _load_labels()
-    for report in reports:
-        if report["id"] not in labels and classify_new and report["photo_path"]:
-            result = classifier.classify(report["photo_path"])
-            if result is not None:
-                save_label(report["id"], result["type"], result["confidence"], "model")
-                labels[report["id"]] = (result["type"], result["confidence"], "model")
-        waste_type, confidence, source = labels.get(report["id"], ("unclassified", None, "none"))
-        report.update(type=waste_type, type_label=TYPE_LABELS.get(waste_type, waste_type),
-                      confidence=confidence, label_source=source)
-    return reports + _read_own_reports()
+def located_reports() -> list[dict[str, Any]]:
+    """Unresolved reports that have a location, each with a waste type
+    (``unclassified`` if the photo was never classified)."""
+    out = []
+    for row in db.list_reports(MAX_REPORTS, include_resolved=False):
+        if row["lat"] is None or row["lng"] is None:
+            continue
+        waste_type = row["waste_type"] or "unclassified"
+        out.append({
+            "id": row["id"],
+            "lat": row["lat"],
+            "lng": row["lng"],
+            "created_at": row["created_at"],
+            "type": waste_type,
+            "type_label": classifier.TYPE_LABELS.get(waste_type, waste_type),
+            "confidence": row["waste_confidence"],
+            "simulated": bool(row["note"] and row["note"].startswith(SIMULATED_NOTE_PREFIX)),
+        })
+    return out
 
 
 def _distance_m(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
@@ -227,13 +115,9 @@ def find_hotspots(reports: list[dict[str, Any]]) -> list[dict[str, Any]]:
             "lng": lng,
             "count": len(members),
             "dominant_type": dominant,
-            "dominant_label": TYPE_LABELS.get(dominant, dominant),
-            "types": dict(types),
+            "dominant_label": classifier.TYPE_LABELS.get(dominant, dominant),
             "recyclable_share": sum(1 for r in members
                                     if classifier.LABELS.get(r["type"], ("", "", False))[2]) / len(members),
-            "nearest_bin": bin_label,
-            "nearest_bin_m": bin_m,
-            "latest_report": max(r["created_at"] for r in members),
             **_recommend(len(members), dominant, bin_label, bin_m),
         })
     hotspots.sort(key=lambda h: h["count"], reverse=True)

@@ -24,8 +24,7 @@ If a bin reports no visit counts, the model drops the footfall term and
 becomes a plain Bayesian fill-over-time regression.
 
 Pure functions over reading rows: no database or FastAPI imports here, so
-it can be tested on its own (see data.py in this folder for the row
-shape).
+it can be tested on its own. Rows are what app.db.history() returns.
 """
 from __future__ import annotations
 

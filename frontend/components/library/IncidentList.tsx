@@ -57,9 +57,12 @@ export default function IncidentList({ reports: initial }: { reports: ReportReco
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-sm font-medium">{report.note || "Community report: littered area"}</p>
-              <Badge variant={report.resolved ? "good" : "warning"} dot>
-                {report.resolved ? "Resolved" : "Open"}
-              </Badge>
+              <div className="flex items-center gap-1.5">
+                {report.wasteLabel && <Badge variant="outline">{report.wasteLabel}</Badge>}
+                <Badge variant={report.resolved ? "good" : "warning"} dot>
+                  {report.resolved ? "Resolved" : "Open"}
+                </Badge>
+              </div>
             </div>
             <div className="mt-1.5 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
               <span>{new Date(report.createdAt).toLocaleString()}</span>

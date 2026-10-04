@@ -1,58 +1,25 @@
-"""Per-bin fill-rate forecast for the municipal dashboard's Insights page.
+"""Per-bin collection forecast for the municipal dashboard's Insights page.
 
-Today this is a naive linear projection over each bin's recent
-fill-history (the same rows app.db.history() already returns), not a
-trained model — app/forecasting/ is reserved for that (see its README,
-it's scaffolded but not built). The point of this file is the response
-contract: {binId, label, predictedFullInHours, riskLevel, source}. Drop
-the real model's prediction into source="model" here and the frontend
-(lib/api.ts getForecast, app/dashboard/insights) needs no changes at
-all, it already renders whichever source it's given.
+Fits machine_learning/model.py (a Bayesian regression of fill gained
+against time and visits) to each bin's stored readings, so it works the
+same on real sensor data as on the mock generator's. Each row carries the
+readings it was made from, so the dashboard can chart them without a
+second request.
 """
 from __future__ import annotations
 
-from datetime import datetime
-
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 
 from app import db
 from app.config import DEVICE_REGISTRY, device_info, get_settings
-from app.models import ForecastPoint, RiskLevel
+from app.machine_learning import model
+from app.models import ForecastHistoryPoint, ForecastPoint, PlacementEstimate
 
 router = APIRouter(prefix="/api/forecast", tags=["forecast"])
 
-MIN_POINTS_FOR_TREND = 3
 
-
-def _linear_slope(points: list[dict]) -> float | None:
-    """Least-squares slope of fill_pct over time, in percent per hour.
-    None if there isn't enough history, or the points span ~0 time (a
-    slope needs more than one instant).
-    """
-    if len(points) < MIN_POINTS_FOR_TREND:
-        return None
-
-    hours = [datetime.fromisoformat(p["ts"]).timestamp() / 3600 for p in points]
-    values = [p["fill_pct"] for p in points]
-    n = len(points)
-    mean_t = sum(hours) / n
-    mean_v = sum(values) / n
-
-    denominator = sum((t - mean_t) ** 2 for t in hours)
-    if denominator == 0:
-        return None
-    numerator = sum((t - mean_t) * (v - mean_v) for t, v in zip(hours, values))
-    return numerator / denominator
-
-
-def _risk_level(hours_to_critical: float | None) -> RiskLevel:
-    if hours_to_critical is None:
-        return "low"
-    if hours_to_critical <= 12:
-        return "high"
-    if hours_to_critical <= 48:
-        return "medium"
-    return "low"
+def _round(value: float | None, digits: int = 2) -> float | None:
+    return round(value, digits) if value is not None else None
 
 
 @router.get("", response_model=list[ForecastPoint])
@@ -61,26 +28,42 @@ def get_forecast() -> list[ForecastPoint]:
     out: list[ForecastPoint] = []
 
     for device_id in sorted(DEVICE_REGISTRY):
-        info = device_info(device_id)
-        points = db.history(device_id, settings.max_history_points)
-        current = points[-1]["fill_pct"] if points else None
-        slope = _linear_slope(points)
-
-        hours_to_critical: float | None = None
-        if slope is not None and slope > 0 and current is not None:
-            remaining_pct = settings.fill_critical_pct - current
-            hours_to_critical = max(remaining_pct / slope, 0.0) if remaining_pct > 0 else 0.0
-
+        points = db.history(device_id, settings.forecast_history_points)
+        result = model.predict(points, settings.fill_critical_pct)
+        hours = result.get("hours")
         out.append(
             ForecastPoint(
                 binId=device_id,
-                label=info.label,
-                predictedFullInHours=(
-                    round(hours_to_critical, 1) if hours_to_critical is not None else None
-                ),
-                riskLevel=_risk_level(hours_to_critical),
-                source="heuristic",
+                label=device_info(device_id).label,
+                status=result["status"],
+                predictedFullInHours=_round(hours),
+                predictedLowHours=_round(result.get("hours_low")),
+                predictedHighHours=_round(result.get("hours_high")),
+                fillPerVisitPct=_round(result.get("fill_per_visit_pct"), 3),
+                visitsPerHour=_round(result.get("visits_per_hour"), 1),
+                lastReadingAt=points[-1]["ts"] if points else None,
+                history=[ForecastHistoryPoint(ts=p["ts"], fillPct=p["fill_pct"]) for p in points],
             )
         )
 
     return out
+
+
+@router.get("/placement", response_model=PlacementEstimate)
+def get_placement_estimate(
+    visits_per_hour: float = Query(alias="visitsPerHour", ge=0),
+) -> PlacementEstimate:
+    """Bin placement: how fast would an empty bin fill at a spot with this
+    footfall? Pools every monitored bin's readings into one fit."""
+    settings = get_settings()
+    histories = [db.history(device_id, settings.forecast_history_points) for device_id in DEVICE_REGISTRY]
+    result = model.estimate_for_footfall(histories, visits_per_hour, settings.fill_critical_pct)
+    return PlacementEstimate(
+        status=result["status"],
+        visitsPerHour=visits_per_hour,
+        fillPctPerHour=_round(result.get("rate_pct_per_hour")),
+        fillPerVisitPct=_round(result.get("fill_per_visit_pct"), 3),
+        hoursToThreshold=_round(result.get("hours")),
+        hoursLow=_round(result.get("hours_low")),
+        hoursHigh=_round(result.get("hours_high")),
+    )

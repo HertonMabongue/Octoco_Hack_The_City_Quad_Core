@@ -6,6 +6,7 @@ Run with: uvicorn main:app --reload --app-dir backend
 from __future__ import annotations
 
 import logging
+import threading
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -15,7 +16,8 @@ from fastapi.staticfiles import StaticFiles
 
 from app import city_client, db, mock_generator, watchdog
 from app.config import get_settings
-from app.routers import alerts, bins, forecast, ingest, reports
+from app.machine_learning import classifier
+from app.routers import alerts, bins, forecast, hotspots, ingest, reports
 
 # Without this, our own logger.info()/logger.warning() calls across the
 # app are silently dropped — Python's root logger defaults to WARNING
@@ -30,6 +32,10 @@ async def lifespan(_app: FastAPI):
     db.init_db()
     mock_generator.start(settings)
     watchdog.start(settings)
+    # Loading the photo model can take minutes the first time (it downloads),
+    # so do it now in the background instead of during a resident's upload.
+    if classifier.installed():
+        threading.Thread(target=classifier.available, daemon=True).start()
     yield
     watchdog.stop()
     mock_generator.stop()
@@ -55,6 +61,7 @@ app.include_router(alerts.router)
 app.include_router(reports.router)
 app.include_router(ingest.router)
 app.include_router(forecast.router)
+app.include_router(hotspots.router)
 
 
 @app.get("/health", tags=["meta"])

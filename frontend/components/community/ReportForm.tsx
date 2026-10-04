@@ -1,16 +1,17 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { CheckCircle2, Loader2, MapPin } from "lucide-react";
+import { CheckCircle2, Loader2, MapPin, XCircle } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { submitReport } from "@/lib/api";
+import type { ReportResult } from "@/lib/types";
 
 import PhotoUpload from "./PhotoUpload";
 
-type Status = "idle" | "locating" | "submitting" | "done" | "error";
+type Status = "idle" | "locating" | "submitting" | "done" | "rejected" | "error";
 
 interface Coords {
   lat: number;
@@ -24,6 +25,7 @@ export default function ReportForm() {
   const [note, setNote] = useState("");
   const [coords, setCoords] = useState<Coords | null>(null);
   const [status, setStatus] = useState<Status>("idle");
+  const [result, setResult] = useState<ReportResult | null>(null);
 
   function captureLocation() {
     if (!navigator.geolocation) return;
@@ -42,8 +44,9 @@ export default function ReportForm() {
     event.preventDefault();
     setStatus("submitting");
     try {
-      await submitReport({ lat: coords?.lat, lng: coords?.lng, note, photo });
-      setStatus("done");
+      const outcome = await submitReport({ lat: coords?.lat, lng: coords?.lng, note, photo });
+      setResult(outcome);
+      setStatus(outcome.status === "rejected" ? "rejected" : "done");
     } catch {
       setStatus("error");
     }
@@ -53,7 +56,11 @@ export default function ReportForm() {
     return (
       <div className="flex items-start gap-3 rounded-xl border border-status-good/30 bg-status-good/10 p-4 text-sm">
         <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-status-good" />
-        <p>Thanks, your report was submitted and will show up on the municipal dashboard.</p>
+        <p>
+          Thanks, your report was submitted and will show up on the municipal dashboard.
+          {result?.wasteLabel && <> It looks like: {result.wasteLabel}.</>}
+          {result?.message && <> {result.message}</>}
+        </p>
       </div>
     );
   }
@@ -79,12 +86,25 @@ export default function ReportForm() {
           <MapPin className="h-4 w-4" />
           {coords ? "Location captured" : status === "locating" ? "Locating…" : "Use my location"}
         </Button>
+        {!coords && (
+          <p className="mt-1.5 text-xs text-muted-foreground">
+            Without a location (or a geotagged photo) the report can&apos;t appear on the hotspot
+            map.
+          </p>
+        )}
       </div>
 
       <Button type="submit" disabled={status === "submitting"}>
         {status === "submitting" && <Loader2 className="h-4 w-4 animate-spin" />}
         {status === "submitting" ? "Submitting…" : "Submit report"}
       </Button>
+
+      {status === "rejected" && (
+        <div className="flex items-start gap-3 rounded-xl border border-status-warning/30 bg-status-warning/10 p-4 text-sm">
+          <XCircle className="mt-0.5 h-5 w-5 shrink-0 text-status-warning" />
+          <p>{result?.message ?? "No waste found in this photo, so the report wasn't added."}</p>
+        </div>
+      )}
 
       {status === "error" && (
         <p className="text-sm text-destructive">Something went wrong. Try again.</p>

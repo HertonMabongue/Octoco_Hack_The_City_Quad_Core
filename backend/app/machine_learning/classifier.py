@@ -10,6 +10,7 @@ this folder still works: photos are simply left as "unclassified".
 """
 from __future__ import annotations
 
+import threading
 from pathlib import Path
 from typing import Any
 
@@ -27,8 +28,15 @@ LABELS: dict[str, tuple[str, str, bool]] = {
     "no_waste": ("a photo of a clean street with no rubbish", "No waste visible", False),
 }
 
+# What to call each type in the UI, including the two that aren't model labels.
+TYPE_LABELS = {key: label for key, (_, label, _) in LABELS.items()}
+TYPE_LABELS.update(unclear="Unclear photo", unclassified="Not classified")
+
 _pipeline: Any = None
 _load_error: str | None = None
+# The model is warmed up in the background at startup (main.py) while an
+# upload may trigger the same load, so make sure it only happens once.
+_load_lock = threading.Lock()
 
 
 def installed() -> bool:
@@ -50,14 +58,15 @@ def load_error() -> str | None:
 
 def _load() -> None:
     global _pipeline, _load_error
-    if _pipeline is not None or _load_error is not None:
-        return
-    try:
-        from transformers import pipeline
+    with _load_lock:
+        if _pipeline is not None or _load_error is not None:
+            return
+        try:
+            from transformers import pipeline
 
-        _pipeline = pipeline("zero-shot-image-classification", model=MODEL_NAME)
-    except Exception as exc:  # missing packages, no internet for the download, etc.
-        _load_error = f"{type(exc).__name__}: {exc}"
+            _pipeline = pipeline("zero-shot-image-classification", model=MODEL_NAME)
+        except Exception as exc:  # missing packages, no internet for the download, etc.
+            _load_error = f"{type(exc).__name__}: {exc}"
 
 
 def classify(image_path: str | Path) -> dict[str, Any] | None:

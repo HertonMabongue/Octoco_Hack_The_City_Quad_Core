@@ -60,6 +60,12 @@ class Settings(BaseSettings):
 
     max_history_points: int = 50
 
+    # How many of a bin's latest readings the forecast model (see
+    # machine_learning/model.py) is fitted on. Longer than the chart
+    # history above: a real bin fills slowly, and 50 readings (~25 min at
+    # one per 30s) is too short a window to see a trend in it.
+    forecast_history_points: int = 240
+
     cors_origins: list[str] = ["*"]
 
     # Mock telemetry — generates plausible readings for every device in

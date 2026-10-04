@@ -111,6 +111,12 @@ def init_db() -> None:
         existing_report_columns = {row[1] for row in con.execute("PRAGMA table_info(reports)").fetchall()}
         if "resolved" not in existing_report_columns:
             con.execute("ALTER TABLE reports ADD COLUMN resolved INTEGER NOT NULL DEFAULT 0")
+        # What the photo classifier (machine_learning/classifier.py) decided
+        # the report shows. NULL for reports made before it existed, or while
+        # its packages weren't installed.
+        for column, sql_type in (("waste_type", "TEXT"), ("waste_confidence", "REAL")):
+            if column not in existing_report_columns:
+                con.execute(f"ALTER TABLE reports ADD COLUMN {column} {sql_type}")
 
         con.commit()
 
@@ -240,13 +246,16 @@ def history(device_id: str, limit: int) -> list[dict[str, Any]]:
     with get_connection() as con:
         rows = con.execute(
             """
-            SELECT ts, fill_pct FROM readings
+            SELECT ts, fill_pct, people_count FROM readings
             WHERE device_id = ?
             ORDER BY id DESC LIMIT ?
             """,
             (device_id, limit),
         ).fetchall()
-    return [{"ts": ts, "fill_pct": fill_pct} for ts, fill_pct in rows][::-1]
+    return [
+        {"ts": ts, "fill_pct": fill_pct, "people_count": people_count}
+        for ts, fill_pct, people_count in rows
+    ][::-1]
 
 
 def insert_alert(device_id: str, alert_type: str, message: str) -> None:
@@ -318,12 +327,22 @@ def get_alert(alert_id: str) -> dict[str, Any] | None:
     }
 
 
-def insert_report(lat: float | None, lng: float | None, note: str | None, photo_path: str | None) -> str:
+def insert_report(
+    lat: float | None,
+    lng: float | None,
+    note: str | None,
+    photo_path: str | None,
+    waste_type: str | None = None,
+    waste_confidence: float | None = None,
+) -> str:
     report_id = str(uuid.uuid4())
     with get_connection() as con:
         con.execute(
-            "INSERT INTO reports(id, lat, lng, note, photo_path, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-            (report_id, lat, lng, note, photo_path, utc_now()),
+            """
+            INSERT INTO reports(id, lat, lng, note, photo_path, created_at, waste_type, waste_confidence)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (report_id, lat, lng, note, photo_path, utc_now(), waste_type, waste_confidence),
         )
         con.commit()
     return report_id
@@ -336,7 +355,10 @@ def list_reports(limit: int, include_resolved: bool = True) -> list[dict[str, An
     for the library, where an operator reviewing past incidents outnumbers
     one triaging only what's still open.
     """
-    query = "SELECT id, lat, lng, note, photo_path, created_at, resolved FROM reports"
+    query = (
+        "SELECT id, lat, lng, note, photo_path, created_at, resolved, waste_type, waste_confidence "
+        "FROM reports"
+    )
     if not include_resolved:
         query += " WHERE resolved = 0"
     query += " ORDER BY created_at DESC LIMIT ?"
@@ -352,6 +374,8 @@ def list_reports(limit: int, include_resolved: bool = True) -> list[dict[str, An
             "photo_path": r[4],
             "created_at": r[5],
             "resolved": bool(r[6]),
+            "waste_type": r[7],
+            "waste_confidence": r[8],
         }
         for r in rows
     ]

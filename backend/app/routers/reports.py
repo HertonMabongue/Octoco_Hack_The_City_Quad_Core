@@ -7,9 +7,11 @@ import uuid
 from pathlib import Path
 
 from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile
+from fastapi.concurrency import run_in_threadpool
 
 from app import db
 from app.config import get_settings
+from app.machine_learning import classifier
 from app.models import Report, ReportResult
 
 router = APIRouter(prefix="/api/reports", tags=["reports"])
@@ -62,6 +64,7 @@ def _to_report(row: dict) -> Report:
         photoUrl=_photo_url(row["photo_path"]),
         createdAt=row["created_at"],
         resolved=row["resolved"],
+        wasteLabel=classifier.TYPE_LABELS.get(row["waste_type"]) if row["waste_type"] else None,
     )
 
 
@@ -92,11 +95,46 @@ async def submit_report(
     note: str | None = Form(default=None),
     photo: UploadFile | None = File(default=None),
 ) -> ReportResult:
+    """Stores a report. If a photo comes with it and the photo model is
+    installed, the photo is first checked for waste: one with none in it
+    is rejected (and deleted), otherwise its waste type is kept on the
+    report so it can feed the hotspot map. The photo's own geotag, if it
+    has one, takes priority over the lat/lng sent with it.
+    """
     photo_path = _save_photo(photo) if photo is not None else None
-    report_id = db.insert_report(lat, lng, note, photo_path)
 
+    result = None
+    if photo_path:
+        if classifier.installed():
+            # Blocking, and slow on first use while the model loads.
+            result = await run_in_threadpool(classifier.classify, photo_path)
+        geotag = classifier.photo_location(photo_path)
+        if geotag is not None:
+            lat, lng = geotag
+
+    if result is not None and not result["is_waste"]:
+        Path(photo_path).unlink(missing_ok=True)
+        return ReportResult(
+            id="",
+            status="rejected",
+            confidence=round(result["confidence"], 2),
+            message="No waste found in this photo, so the report wasn't added.",
+        )
+
+    waste_type = result["type"] if result else None
+    confidence = result["confidence"] if result else None
+    report_id = db.insert_report(lat, lng, note, photo_path, waste_type, confidence)
+
+    waste_label = classifier.TYPE_LABELS[waste_type] if waste_type else None
     nearest_device = "corridor"
-    message = note.strip() if note and note.strip() else "Community report: littered area"
+    message = note.strip() if note and note.strip() else f"Community report: {waste_label or 'littered area'}"
     db.insert_alert(nearest_device, "littering", message)
 
-    return ReportResult(id=report_id, status="received")
+    return ReportResult(
+        id=report_id,
+        status="received",
+        wasteType=waste_type,
+        wasteLabel=waste_label,
+        confidence=round(confidence, 2) if confidence is not None else None,
+        message=None if result or not photo_path else "Added, but the photo wasn't checked.",
+    )

@@ -20,6 +20,7 @@ four signals.
 from __future__ import annotations
 
 import logging
+import math
 import random
 import threading
 from typing import Any
@@ -39,9 +40,21 @@ GAS_BASELINE_RANGE = (150, 400)
 GAS_SPIKE_CHANCE = 0.03
 GAS_SPIKE_RANGE = (850, 1000)
 
-# PIR events in a ~10s window — occasional 0 is realistic (no one's near
-# the bin right now), occasional high burst crosses TRAFFIC_THRESHOLD (5).
-PEOPLE_COUNT_RANGE = (0, 8)
+# PIR events in a ~10s window, Poisson-distributed around a per-bin mean
+# (a busy corner vs a quiet one). 0 is realistic — no one's near the bin
+# right now — and a burst can cross TRAFFIC_THRESHOLD (5).
+PEOPLE_COUNT_MEAN = {"bin-01": 2.0, "bin-02": 3.5, "bin-03": 1.5}
+DEFAULT_PEOPLE_COUNT_MEAN = 2.0
+
+# Fill gained per tick = a small constant + FILL_PER_VISIT_PCT per visit,
+# where visits = count scaled from the firmware's 10s window up to the tick
+# (the same scaling machine_learning/model.py undoes). Fill depends on
+# footfall, like a real bin, so the forecast model has a relationship to
+# learn instead of noise.
+BASE_FILL_PER_TICK_PCT = 0.5
+FILL_PER_VISIT_PCT = 0.15
+PEOPLE_WINDOW_S = 10.0
+SENSOR_NOISE_PCT = 0.3
 
 # Rare, like a real tamper/theft attempt should be.
 MOVEMENT_ALERT_CHANCE = 0.02
@@ -49,6 +62,16 @@ MOVEMENT_ALERT_CHANCE = 0.02
 _state: dict[str, dict[str, float]] = {}
 _stop_event = threading.Event()
 _thread: threading.Thread | None = None
+
+
+def _poisson(mean: float) -> int:
+    """Small Poisson draw (Knuth's method), no numpy needed here."""
+    limit, k, p = math.exp(-mean), 0, 1.0
+    while True:
+        p *= random.random()
+        if p <= limit:
+            return k
+        k += 1
 
 
 def _initial_state() -> dict[str, float]:
@@ -59,14 +82,18 @@ def _tick(device_id: str, interval_s: int) -> dict[str, Any]:
     state = _state.setdefault(device_id, _initial_state())
     state["uptime_s"] += interval_s
 
-    # Random walk upward, with a chance to "empty" once nearly full —
+    people_count = _poisson(PEOPLE_COUNT_MEAN.get(device_id, DEFAULT_PEOPLE_COUNT_MEAN))
+
+    # Fills with footfall, with a chance to "empty" once nearly full —
     # simulates a collection run so the demo doesn't just alarm forever.
     if state["fill_pct"] >= OVERFLOW_THRESHOLD_PCT and random.random() < 0.3:
         state["fill_pct"] = random.uniform(3, 12)
     else:
-        state["fill_pct"] = min(100.0, state["fill_pct"] + random.uniform(1.0, 4.5))
+        visits = people_count * interval_s / PEOPLE_WINDOW_S
+        gained = BASE_FILL_PER_TICK_PCT + FILL_PER_VISIT_PCT * visits
+        state["fill_pct"] = min(100.0, state["fill_pct"] + gained)
 
-    fill_pct = round(state["fill_pct"], 1)
+    fill_pct = round(min(max(state["fill_pct"] + random.gauss(0, SENSOR_NOISE_PCT), 0.0), 100.0), 1)
     distance_cm = round(BIN_DEPTH_CM * (1 - fill_pct / 100), 1)
 
     gas_raw = (
@@ -81,7 +108,7 @@ def _tick(device_id: str, interval_s: int) -> dict[str, Any]:
         "distance_cm": max(distance_cm, 0.0),
         "overflow_flag": fill_pct >= OVERFLOW_THRESHOLD_PCT,
         "gas_raw": gas_raw,
-        "people_count": random.randint(*PEOPLE_COUNT_RANGE),
+        "people_count": people_count,
         "movement_alert": random.random() < MOVEMENT_ALERT_CHANCE,
     }
 

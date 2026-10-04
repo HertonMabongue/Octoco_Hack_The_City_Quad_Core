@@ -49,11 +49,18 @@ export interface ReportInput {
   photo?: File | null;
 }
 
-export type ReportStatus = "queued" | "received";
+export type ReportStatus = "queued" | "received" | "rejected";
 
+// Outcome of a community photo report. "rejected" means the photo
+// classifier (backend/app/machine_learning/classifier.py) found no waste
+// in it, so nothing was stored. "queued" is only ever the offline mock.
 export interface ReportResult {
   id: string;
   status: ReportStatus;
+  wasteType?: string | null;
+  wasteLabel?: string | null;
+  confidence?: number | null;
+  message?: string | null;
 }
 
 // A stored community report, for the municipal dashboard's incident log
@@ -67,18 +74,71 @@ export interface ReportRecord {
   photoUrl: string | null;
   createdAt: string;
   resolved: boolean;
+  wasteLabel?: string | null;
 }
 
-export type RiskLevel = "low" | "medium" | "high";
-export type ForecastSource = "heuristic" | "model";
+export type ForecastStatus = "ok" | "at_threshold" | "not_filling" | "not_enough_data";
 
-// One bin's projected time to needing collection (app/dashboard/insights).
-// `source` distinguishes today's naive projection from the real model in
-// backend/app/forecasting/ once it's trained — same shape either way.
+export interface ForecastHistoryPoint {
+  ts: string;
+  fillPct: number;
+}
+
+// One bin's time-to-collection forecast from the Bayesian model in
+// backend/app/machine_learning/model.py, plus the readings it was made
+// from so the Insights page can chart them. The three `predicted*Hours`
+// values (median and 80% range) count from `lastReadingAt`, and are set
+// only when `status` is "ok" (all 0 for "at_threshold").
 export interface ForecastPoint {
   binId: string;
   label: string;
+  status: ForecastStatus;
   predictedFullInHours: number | null;
-  riskLevel: RiskLevel;
-  source: ForecastSource;
+  predictedLowHours: number | null;
+  predictedHighHours: number | null;
+  fillPerVisitPct: number | null;
+  visitsPerHour: number | null;
+  lastReadingAt: string | null;
+  history: ForecastHistoryPoint[];
+}
+
+export type HotspotAction = "add_bin" | "more_staff" | "cleanup_crew";
+
+// A cluster of nearby littering reports and what the city should do about
+// it (backend/app/machine_learning/hotspots.py).
+export interface Hotspot {
+  id: string;
+  lat: number;
+  lng: number;
+  count: number;
+  dominantLabel: string;
+  recyclableShare: number;
+  action: HotspotAction;
+  title: string;
+  reason: string;
+}
+
+export interface HotspotReport {
+  id: string;
+  lat: number;
+  lng: number;
+  type: string;
+  typeLabel: string;
+  confidence: number | null;
+  createdAt: string;
+  hotspot: string | null;
+  simulated: boolean;
+}
+
+export interface HotspotsResponse {
+  classifierInstalled: boolean;
+  summary: {
+    reports: number;
+    hotspots: number;
+    addBin: number;
+    moreStaff: number;
+    cleanupCrew: number;
+  };
+  hotspots: Hotspot[];
+  reports: HotspotReport[];
 }

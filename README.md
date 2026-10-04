@@ -84,18 +84,20 @@ offline if it stops reporting for `OFFLINE_AFTER_S` (default 90s).
 
 CamelCase everywhere; `backend/app/models.py` is the source of truth, mirrored in `frontend/lib/types.ts`.
 
-| Method | Path                       | Description                                                  |
-| ------ | -------------------------- | ------------------------------------------------------------ |
-| GET    | `/api/bins`                | All bins, derived from latest telemetry + status             |
-| GET    | `/api/bins/:id`            | One bin                                                      |
-| GET    | `/api/bins/:id/history`    | Fill-level history                                           |
-| GET    | `/api/alerts`              | Active alerts (resolved ones hidden by default)              |
-| POST   | `/api/alerts/:id/resolve`  | Mark an alert resolved                                       |
-| POST   | `/api/reports`             | Multipart: `lat`, `lng`, `note`, `photo`                     |
-| GET    | `/api/reports`             | All community reports (resolved included)                    |
-| POST   | `/api/reports/:id/resolve` | Mark a report resolved                                       |
-| GET    | `/api/forecast`            | Per-bin projected time to collection (see Forecasting below) |
-| GET    | `/health`                  | Liveness + per-device city broker connection state           |
+| Method | Path                       | Description                                                                                         |
+| ------ | -------------------------- | --------------------------------------------------------------------------------------------------- |
+| GET    | `/api/bins`                | All bins, derived from latest telemetry + status                                                    |
+| GET    | `/api/bins/:id`            | One bin                                                                                             |
+| GET    | `/api/bins/:id/history`    | Fill-level history                                                                                  |
+| GET    | `/api/alerts`              | Active alerts (resolved ones hidden by default)                                                     |
+| POST   | `/api/alerts/:id/resolve`  | Mark an alert resolved                                                                              |
+| POST   | `/api/reports`             | Multipart: `lat`, `lng`, `note`, `photo` (photo is checked for waste; `status: "rejected"` if none) |
+| GET    | `/api/reports`             | All community reports (resolved included)                                                           |
+| POST   | `/api/reports/:id/resolve` | Mark a report resolved                                                                              |
+| GET    | `/api/forecast`            | Per-bin collection forecast + the readings it used (see Machine learning below)                     |
+| GET    | `/api/forecast/placement`  | `?visitsPerHour=N` — how fast a new bin would fill at that footfall                                 |
+| GET    | `/api/hotspots`            | Litter hotspots from photo reports, with a recommended action each                                  |
+| GET    | `/health`                  | Liveness + per-device city broker connection state                                                  |
 
 `Bin.status` (`good`/`warning`/`critical`) is derived from `fillPct`
 against `FILL_WARNING_PCT`/`FILL_CRITICAL_PCT` — tune in
@@ -141,9 +143,9 @@ backend/
     city_client.py        Speaks the city MQTT protocol (+ HTTP fallback)
     mock_generator.py     Generates readings until firmware is posting
     watchdog.py             Marks stale devices offline
-    routers/                 bins, alerts, reports, ingest, forecast
-    forecasting/              Fill-rate prediction model — scaffolded,
-                               not built; see its README before starting
+    routers/                 bins, alerts, reports, ingest, forecast, hotspots
+    machine_learning/         Fill forecast, photo classifier, hotspots —
+                               see its README
 ```
 
 **Frontend**
@@ -159,35 +161,19 @@ npm run dev        # or: lint / typecheck / build / format
 
 </details>
 
-## Forecasting (ML — not built yet)
+## Machine learning
 
-`backend/app/forecasting/` is reserved for the predictive layer: models that
-use the bin's sensor readings to act before a problem happens instead of
-after. Every bin already stores four independent signals in the `readings`
-table, so there is more than one thing worth predicting:
+- **Collection forecast** (`model.py`) — a Bayesian regression of fill gained
+  against time and visits, fitted per bin on the `readings` table
+  (`fill_pct` from the ultrasonic sensor, `people_count` from the PIR). It
+  reads whatever is stored, so it works the same on mock and real firmware
+  readings.
+- **Photo classifier** (`classifier.py`) — a pretrained CLIP model checks
+  that a resident's photo shows waste, and which type. Optional install:
+  `pip install -r backend/requirements-vision.txt`. Without it, photos are stored unchecked.
+- **Hotspots** (`hotspots.py`) — clusters located reports (DBSCAN) and
+  recommends a bin, more staff, or a clean-up crew.
 
-| Signal (column)           | Sensor        | Possible model                                                                                                            |
-| ------------------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| `fill_pct`, `distance_cm` | Ultrasonic    | Regression on fill history → **time-to-full**, so collection is scheduled before overflow                                 |
-| `people_count`            | PIR           | Foot-traffic profile by hour/day → adjusts the fill rate (a busy bin fills faster) and improves the time-to-full estimate |
-| `gas_raw`                 | Gas           | Trend / anomaly detection → early **hazard** warning, before `GAS_ALERT_RAW` is crossed                                   |
-| `movement_alert`          | Accelerometer | Anomaly detection on tamper/knock events → separates a bin being emptied or moved from possible theft                     |
-
-Time-to-full is the headline model; the others are extensions, and they can
-also feed it as extra features. Which of these gets built is up to whoever
-picks this up. Not started — see `backend/app/forecasting/README.md` before
-you begin.
-
-> **Heads up:** `app.db.history()` currently returns only `ts` and
-> `fill_pct`. Anything that uses the other sensors needs that query widened
-> (or a new function next to it) to return the extra columns.
-
-Until the real model lands, `backend/app/routers/forecast.py` serves `GET
-/api/forecast` from a naive linear projection over that same `fill_pct`
-history — the same "mock it until it's real" move as `mock_generator.py`
-for telemetry, so the dashboard's Insights page already has something real
-to show. Every forecast point carries `source: "heuristic"`; swapping the
-real model in only means changing that one field to `"model"` and the
-projection itself — the response shape (`ForecastPoint` in `models.py` /
-`types.ts`) doesn't change, so the frontend needs no updates when the real
-model replaces the heuristic.
+**Switching to real sensor readings:** set `MOCK_TELEMETRY_ENABLED=false`
+and have firmware POST to `/api/devices/{id}/readings` including
+`people_count`.
