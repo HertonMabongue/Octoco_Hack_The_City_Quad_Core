@@ -15,7 +15,7 @@ import { SESSION_COOKIE, decodeSession } from "@/lib/auth";
 //   resident  everyone else (home page, community app): public bin
 //             status and recycling guidance only, no operational data
 //
-// Set GEMINI_API_KEY in frontend/.env.local (and in Vercel's environment
+// Set GEMINI_API_KEY in the repo-root .env (and in Vercel's environment
 // variables for the hosted site). GEMINI_MODEL is optional.
 
 export const dynamic = "force-dynamic";

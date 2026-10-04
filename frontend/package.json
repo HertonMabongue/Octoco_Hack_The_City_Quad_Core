@@ -3,9 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "node scripts/run-next.js dev",
     "build": "next build",
-    "start": "next start",
+    "start": "node scripts/run-next.js start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "format": "prettier --write .",
